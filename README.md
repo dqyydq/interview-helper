@@ -2,7 +2,7 @@
 
 一个面向技术候选人的开源 AI 模拟面试应用。产品根据目标公司、面试轮次、岗位方向、个人题库和简历，组织连续追问，并在结束后提供基于真实回答证据的评估。
 
-当前项目处于规格与实施准备阶段，尚未开始业务代码开发。
+当前项目已进入 Phase 1 实施阶段。Milestone 0 提供 FastAPI 健康检查、React 应用壳与本地 PostgreSQL 编排。
 
 ## 文档
 
@@ -21,4 +21,50 @@
 
 ## 开发状态
 
-下一步从实施计划的 Milestone 0 开始建立可重复的本地开发环境。
+### 1. 准备配置
+
+```powershell
+Copy-Item .env.example .env
+```
+
+### 2. 启动 PostgreSQL
+
+```powershell
+docker compose up -d postgres
+```
+
+### 3. 安装并启动后端
+
+Python 环境统一使用 uv 管理：
+
+```powershell
+$env:UV_CACHE_DIR = "$PWD\.uv-cache"
+$env:UV_PYTHON_INSTALL_DIR = "$PWD\.uv-python"
+uv venv --python 3.12 .venv
+. .\.venv\Scripts\Activate.ps1
+uv pip install -e ".\backend[dev]"
+Set-Location backend
+python -m uvicorn app.main:app --reload
+```
+
+健康检查地址为 `http://localhost:8000/api/health`。PostgreSQL 不可用时进程仍能启动，并返回 `degraded`。
+
+### 4. 安装并启动前端
+
+```powershell
+Set-Location frontend
+npm install
+npm run dev
+```
+
+前端默认运行在 `http://localhost:5173`。
+
+### 5. 验证
+
+```powershell
+. .\.venv\Scripts\Activate.ps1
+python -m pytest backend\tests
+Set-Location frontend
+npm test
+npm run build
+```

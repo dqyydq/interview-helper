@@ -1,0 +1,361 @@
+:root {
+  color: #121821;
+  background: #f5f7fa;
+  font-family:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.app-shell {
+  display: grid;
+  min-height: 100vh;
+  grid-template-rows: 72px 1fr 42px;
+  background:
+    linear-gradient(rgba(19, 31, 47, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(19, 31, 47, 0.035) 1px, transparent 1px),
+    #f7f9fc;
+  background-size: 32px 32px;
+}
+
+.topbar {
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto minmax(160px, 1fr);
+  align-items: center;
+  padding: 0 28px;
+  color: #f6f8fb;
+  background: #0b0f14;
+  border-bottom: 1px solid #202933;
+}
+
+.brand {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.brand-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: #0b0f14;
+  background: #f6f8fb;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.brand strong,
+.brand small {
+  display: block;
+}
+
+.brand strong {
+  font-size: 14px;
+  letter-spacing: 0.055em;
+}
+
+.brand small {
+  margin-top: 2px;
+  color: #8692a0;
+  font-size: 11px;
+}
+
+.primary-nav {
+  display: flex;
+  height: 100%;
+  align-items: stretch;
+}
+
+.nav-link {
+  position: relative;
+  display: flex;
+  min-width: 112px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #98a3af;
+  font-size: 13px;
+  text-decoration: none;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: #ffffff;
+  background: #111821;
+}
+
+.nav-link.active::after {
+  position: absolute;
+  right: 20px;
+  bottom: 0;
+  left: 20px;
+  height: 2px;
+  background: #1769ff;
+  content: "";
+}
+
+.github-link {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+  color: #c4ccd5;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.github-link:hover {
+  color: #ffffff;
+}
+
+.workspace {
+  display: grid;
+  min-height: 0;
+  padding: clamp(24px, 5vw, 72px);
+}
+
+.empty-state {
+  display: grid;
+  min-height: min(680px, calc(100vh - 190px));
+  grid-template-columns: 96px minmax(0, 1fr) minmax(240px, 34%);
+  border: 1px solid #ced5de;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.page-index {
+  padding: 30px 0;
+  color: #8793a1;
+  border-right: 1px solid #d9dfe6;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  text-align: center;
+}
+
+.empty-state-copy {
+  align-self: center;
+  padding: clamp(36px, 7vw, 104px);
+}
+
+.eyebrow {
+  margin: 0 0 24px;
+  color: #1769ff;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.empty-state h1,
+.not-found h1 {
+  max-width: 760px;
+  margin: 0;
+  color: #0b0f14;
+  font-size: clamp(42px, 6vw, 82px);
+  font-weight: 650;
+  letter-spacing: -0.055em;
+  line-height: 0.98;
+}
+
+.description {
+  max-width: 580px;
+  margin: 30px 0 0;
+  color: #556170;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.baseline-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 42px;
+  color: #2f3a47;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  background: #1769ff;
+  box-shadow: 0 0 0 4px rgba(23, 105, 255, 0.12);
+}
+
+.empty-state-action {
+  display: flex;
+  min-height: 280px;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #627080;
+  border-left: 1px solid #d9dfe6;
+  background: #f0f3f7;
+  font-size: 13px;
+}
+
+.not-found {
+  align-self: center;
+  justify-self: center;
+  width: min(760px, 100%);
+  padding: 64px;
+  border-left: 3px solid #1769ff;
+  background: #ffffff;
+}
+
+.not-found p:not(.eyebrow) {
+  margin: 28px 0;
+  color: #5d6875;
+}
+
+.not-found a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #1769ff;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  color: #727e8c;
+  border-top: 1px solid #d7dde5;
+  background: #ffffff;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+
+@media (max-width: 980px) {
+  .topbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .primary-nav {
+    position: fixed;
+    z-index: 2;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 62px;
+    justify-content: center;
+    background: #0b0f14;
+  }
+
+  .nav-link {
+    min-width: min(24vw, 150px);
+  }
+
+  .app-shell {
+    padding-bottom: 62px;
+  }
+
+  .empty-state {
+    grid-template-columns: 68px 1fr;
+  }
+
+  .empty-state-action {
+    grid-column: 1 / -1;
+    min-height: 120px;
+    border-top: 1px solid #d9dfe6;
+    border-left: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .topbar {
+    padding: 0 18px;
+  }
+
+  .brand small,
+  .github-link span,
+  .statusbar span:last-child {
+    display: none;
+  }
+
+  .workspace {
+    padding: 16px;
+  }
+
+  .empty-state {
+    min-height: calc(100vh - 194px);
+    grid-template-columns: 1fr;
+  }
+
+  .page-index {
+    padding: 18px 22px;
+    border-right: 0;
+    border-bottom: 1px solid #d9dfe6;
+    text-align: left;
+  }
+
+  .empty-state-copy {
+    padding: 42px 24px 56px;
+  }
+
+  .empty-state h1,
+  .not-found h1 {
+    font-size: 42px;
+  }
+
+  .nav-link {
+    min-width: 25%;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 10px;
+  }
+
+  .nav-link.active::after {
+    right: 25%;
+    left: 25%;
+  }
+
+  .not-found {
+    padding: 42px 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

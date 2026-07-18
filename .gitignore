@@ -1,5 +1,8 @@
 # Python environments and caches
 .venv/
+.uv-cache/
+.uv-python/
+.npm-cache/
 venv/
 __pycache__/
 *.py[cod]
