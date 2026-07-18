@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { type FormEvent, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { companyApi } from "./api";
 import type { CompanyDraft } from "./types";
@@ -35,6 +36,7 @@ function companyMonogram(name: string) {
 }
 
 export function CompanySelectionPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>();
   const [selectedRoundId, setSelectedRoundId] = useState<string>();
@@ -236,8 +238,13 @@ export function CompanySelectionPage() {
         <button className="secondary-button" type="button" onClick={() => setFormOpen(true)}>
           调整公司
         </button>
-        <button className="primary-button" type="button" disabled title="面试会话将在下一里程碑接入">
-          模拟会话开发中
+        <button
+          className="primary-button"
+          type="button"
+          disabled={!company || !round}
+          onClick={() => navigate(`/interviews/setup?company=${company?.id}&round=${round?.id}`)}
+        >
+          配置本场模拟
         </button>
       </footer>
 

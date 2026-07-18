@@ -1,0 +1,47 @@
+schema_version: "1"
+role_key: llm_application_engineer
+display_name: LLM 应用开发
+capabilities:
+  - key: llm_fundamentals
+    name: 大模型基础
+    weight: 0.18
+  - key: rag_and_retrieval
+    name: RAG 与检索
+    weight: 0.18
+  - key: agent_engineering
+    name: Agent 工程
+    weight: 0.20
+  - key: system_design
+    name: 系统设计
+    weight: 0.18
+  - key: evaluation
+    name: 评估与可观测性
+    weight: 0.14
+  - key: delivery
+    name: 工程交付
+    weight: 0.12
+scenario_templates:
+  - key: rag_quality
+    capability: rag_and_retrieval
+    question_type: system_design
+    prompt: 请设计一个面向企业知识库的 RAG 系统，并说明召回、重排、引用与效果评估方案。
+  - key: agent_reliability
+    capability: agent_engineering
+    question_type: scenario
+    prompt: 一个 Agent 在生产环境中出现循环调用和错误工具选择，你会如何定位并建立可靠性防线？
+  - key: context_budget
+    capability: llm_fundamentals
+    question_type: open_ended
+    prompt: 长对话应用如何管理上下文窗口？请说明信息保留、压缩触发和事实一致性策略。
+  - key: model_gateway
+    capability: system_design
+    question_type: system_design
+    prompt: 请设计一个兼容多家模型协议的模型网关，重点说明路由、重试、限流和成本治理。
+  - key: evaluation_loop
+    capability: evaluation
+    question_type: scenario
+    prompt: 如何为一个大模型应用建立离线评测与线上反馈闭环？请给出指标、数据集和发布门槛。
+  - key: production_delivery
+    capability: delivery
+    question_type: project_deep_dive
+    prompt: 请选择一个你交付过的大模型应用，说明从原型到生产过程中最关键的工程取舍。
