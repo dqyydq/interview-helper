@@ -1,0 +1,69 @@
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+
+# JavaScript
+node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.vite/
+*.tsbuildinfo
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.secrets/
+
+# Local application data
+.data/
+data/
+uploads/
+storage/
+postgres-data/
+*.sqlite
+*.sqlite3
+*.db
+
+# Logs and runtime state
+*.log
+logs/
+*.pid
+*.sock
+
+# Local agent and brainstorming state
+.agents/
+.codex/
+.superpowers/
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Test and browser artifacts
+test-results/
+playwright-report/
+blob-report/
+screenshots/
