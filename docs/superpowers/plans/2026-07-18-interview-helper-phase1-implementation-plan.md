@@ -48,6 +48,8 @@ interview_helper/
 │   │   │   ├── models/
 │   │   │   ├── base.py
 │   │   │   └── session.py
+│   │   ├── context/
+│   │   ├── memory/
 │   │   ├── providers/
 │   │   ├── realtime/
 │   │   ├── schemas/
@@ -176,6 +178,8 @@ interview_helper/
 - `backend/app/db/models/question.py`
 - `backend/app/db/models/resume.py`
 - `backend/app/db/models/interview.py`
+- `backend/app/db/models/context.py`
+- `backend/app/db/models/memory.py`
 - `backend/app/db/models/evaluation.py`
 - `backend/app/db/models/model_connection.py`
 - `backend/app/db/models/job.py`
@@ -187,6 +191,8 @@ interview_helper/
 - 实现设计规格第 14 节的实体与外键。
 - 对历史引用内容采用版本化或软删除。
 - `InterviewMessage` 使用 session 内单调递增 `sequence` 唯一约束。
+- `ConversationSegment`、`ContextSummary` 和 `ContextSnapshot` 保留消息范围与版本。
+- `MemoryItem` 通过 `MemorySource` 引用原始 session/message，并支持状态、冲突和过期。
 - `BackgroundJob` 使用幂等键唯一约束。
 - `EvidenceItem` 保存来源元数据和字段级关联，不保存整页复制内容。
 
@@ -228,6 +234,7 @@ interview_helper/
 - 定义 `chat`、`stream_chat`、`health_check` 与可选 `embeddings`。
 - 内部消息包含 system/user/assistant/tool，但 provider 自行转换协议。
 - 流事件统一为 `text_delta`、`tool_call`、`usage`、`completed`、`failed`。
+- 定义 `TokenCounter` 能力：官方计数、本地 tokenizer 或带安全余量的保守估算。
 - 对结构化输出实现统一校验与有限次数修复入口。
 
 ### Task 2.2：OpenAI-compatible 适配器
@@ -269,7 +276,9 @@ interview_helper/
 - CRUD 模型连接，密钥写入前加密。
 - 读取 API 永不返回完整密钥。
 - 提供连接测试和角色绑定。
+- 保存 context window、最大输出 token、tokenizer 类型、prompt cache 和 token count 能力。
 - 至少要求 Interviewer 与 Evaluator 有有效绑定；其他角色可回退到默认对话模型。
+- `context_summarizer` 未绑定时回退到 Planner。
 
 **验收**
 
@@ -489,9 +498,133 @@ interview_helper/
 
 **建议提交**：`feat: implement precision console selection flow`
 
-## Milestone 6：实时面试引擎
+## Milestone 6：上下文管理与结构化记忆
 
-### Task 6.1：会话服务与状态机
+详细设计以 [上下文管理与记忆系统设计规格](../specs/2026-07-18-context-memory-design.md) 为准。
+
+### Task 6.1：TokenCounter 与 TokenBudget
+
+**文件**
+
+- `backend/app/context/token_counter.py`
+- `backend/app/context/token_budget.py`
+- `backend/tests/context/test_token_counter.py`
+- `backend/tests/context/test_token_budget.py`
+
+**动作**
+
+- 统一官方 token count、本地 tokenizer 和保守估算三种计数方式。
+- 计算 context window 减去输出预留、协议开销和安全余量后的有效输入预算。
+- 实现 60/75/85/95% 压缩级别及各层最小保障。
+- 未知 tokenizer 至少使用 15% 安全余量，绝不把未知计数当作零。
+
+**验收**
+
+- 多种 context window 下均不生成超预算上下文。
+- system、当前问题、最近完整回答和未解决追问无法被低优先级内容挤出。
+
+### Task 6.2：会话状态、分段与结构化摘要
+
+**文件**
+
+- `backend/app/context/session_state.py`
+- `backend/app/context/segmentation.py`
+- `backend/app/context/summarizer.py`
+- `backend/app/schemas/context.py`
+- `backend/tests/context/test_segmentation.py`
+- `backend/tests/context/test_summarizer.py`
+
+**动作**
+
+- 为每个完整题目建立 `ConversationSegment`，当前题目关闭前不压缩。
+- Orchestrator 确定性维护 `InterviewContextState`；模型只能建议，不能直接改状态。
+- Context Summarizer 输出核心回答、显式事实、权衡、边界、未解决点、附件和 evidence message IDs。
+- 校验摘要证据范围；失败时保留原文并标记 `summary_failed`。
+- 非常长会话允许合并旧摘要，但保留子摘要 ID 和覆盖范围。
+
+### Task 6.3：ContextBuilder 与 ContextSnapshot
+
+**文件**
+
+- `backend/app/context/builder.py`
+- `backend/app/context/retrieval.py`
+- `backend/app/context/snapshot.py`
+- `backend/tests/context/test_builder.py`
+- `backend/tests/context/test_snapshot.py`
+
+**动作**
+
+- ContextBuilder 成为唯一 provider prompt 组装入口。
+- 按安全规则、角色/风格、计划/状态、近期原文、摘要、检索内容、输出 schema 的顺序组装。
+- 按稳定 ID 去重，按优先级和 token 预算裁剪。
+- 每次重要调用保存纳入/排除 ID、各层 token、压缩级别、计数方法和 provider usage。
+- 默认不保存完整 prompt 文本；调试捕获必须显式开启并脱敏。
+
+**验收**
+
+- 属性测试证明任何消息序列都不会丢失当前问题。
+- 同一状态与预算产生稳定、可解释的 snapshot。
+- 切换不同 context window 模型无需改写原始会话。
+
+### Task 6.4：长期记忆生命周期与检索
+
+**文件**
+
+- `backend/app/memory/types.py`
+- `backend/app/memory/writer.py`
+- `backend/app/memory/conflicts.py`
+- `backend/app/memory/retriever.py`
+- `backend/tests/memory/test_lifecycle.py`
+- `backend/tests/memory/test_retrieval.py`
+
+**动作**
+
+- 实现 proposed/active/conflicted/rejected/expired 生命周期；`pinned` 作为独立优先级属性。
+- 用户明确项目事实和偏好可以激活；能力与薄弱点首次只 proposed，至少两场独立证据后再自动 active。
+- 相同 canonical key 的不同值新增版本并进入冲突处理，不原位覆盖。
+- MVP 使用 JSONB、标签和 PostgreSQL 全文检索；pgvector 不进入必需依赖。
+- 检索综合相关性、固定、显式事实、置信度、近期性、公司/岗位和重复使用惩罚。
+- Interviewer 不读取历史评级数字；Evaluator 不用长期记忆改变本场评级。
+
+### Task 6.5：记忆 API 与用户控制
+
+**文件**
+
+- `backend/app/api/routes/memories.py`
+- `backend/app/services/memories.py`
+- `frontend/src/pages/MemorySettingsPage.tsx`
+- `frontend/src/features/memory/MemoryList.tsx`
+- `frontend/src/features/memory/MemoryPreview.tsx`
+- `frontend/src/features/memory/*.test.tsx`
+
+**动作**
+
+- 提供列表、编辑、确认、固定、拒绝、删除和按场遗忘。
+- 面试准备页展示本场将使用的记忆，可临时排除。
+- 关闭跨场记忆后停止提取和检索，但不静默删除已有数据。
+- 按场遗忘时移除该来源并重算多来源记忆，防止误删其他会话证据。
+
+### Task 6.6：上下文诊断与长会话验收
+
+**文件**
+
+- `backend/app/api/routes/context_diagnostics.py`
+- `frontend/src/features/diagnostics/ContextUsage.tsx`
+- `backend/tests/context/test_long_session.py`
+- `frontend/e2e/long-interview-memory.spec.ts`
+
+**动作**
+
+- 记录每次调用的 token 分层、压缩率、检索数量和估算方法，不记录敏感正文。
+- 模拟 60 分钟会话和小上下文模型，强制触发多次压缩。
+- 验证第二场面试只召回已激活结构化记忆，删除后不再召回。
+- 验证摘要失败时仍可使用原文继续，最终评估证据不受摘要影响。
+
+**建议提交**：`feat: add layered context and user-controlled memory`
+
+## Milestone 7：实时面试引擎
+
+### Task 7.1：会话服务与状态机
 
 **文件**
 
@@ -505,7 +638,7 @@ interview_helper/
 - 进入 interviewing 前冻结 InterviewPlan 版本。
 - finish 幂等；重复请求不重复创建评估任务。
 
-### Task 6.2：WebSocket 协议
+### Task 7.2：WebSocket 协议
 
 **文件**
 
@@ -522,7 +655,7 @@ interview_helper/
 - 支持最后确认序号恢复与缺失事件补发。
 - 对消息大小、空闲时间和无效状态做限制。
 
-### Task 6.3：Interviewer Agent
+### Task 7.3：Interviewer Agent
 
 **文件**
 
@@ -537,7 +670,7 @@ interview_helper/
 - 将 provider stream 映射为 WebSocket `assistant.delta/message`。
 - 保存最终消息，不把每个 token 写入数据库。
 
-### Task 6.4：实时面试前端
+### Task 7.4：实时面试前端
 
 **文件**
 
@@ -563,9 +696,9 @@ interview_helper/
 
 **建议提交**：`feat: add resumable realtime interview sessions`
 
-## Milestone 7：评估、报告与复盘教练
+## Milestone 8：评估、报告与复盘教练
 
-### Task 7.1：结构化评估 schema
+### Task 8.1：结构化评估 schema
 
 **文件**
 
@@ -578,7 +711,7 @@ interview_helper/
 - 证据只能引用现有 message ID。
 - 缺证据时强制输出 `evidence_insufficient`，不能给强结论。
 
-### Task 7.2：Evaluator Agent
+### Task 8.2：Evaluator Agent
 
 **文件**
 
@@ -590,11 +723,14 @@ interview_helper/
 **动作**
 
 - 评估任务读取冻结计划、风格包版本和完整消息。
+- Evaluator 按 `PlanQuestion` 切分并读取对应原始回答，先做逐题评价，再聚合为本场能力结论。
+- 实时摘要只用于恢复对话连续性，不能替代原始回答成为评分证据。
+- 长期记忆仅用于报告中的跨场趋势对比，不得改变本场评分。
 - 使用结构化输出；校验引用、维度完整性和枚举。
 - 有限修复失败后保留会话并标记可重评。
 - SSE 返回阶段进度，不流出内部推理文本。
 
-### Task 7.3：报告页面
+### Task 8.3：报告页面
 
 **文件**
 
@@ -609,7 +745,7 @@ interview_helper/
 - 少于两次可比会话时隐藏趋势，不显示空图表。
 - 不显示 Offer 概率。
 
-### Task 7.4：Coach Agent
+### Task 8.4：Coach Agent
 
 **文件**
 
@@ -626,9 +762,9 @@ interview_helper/
 
 **建议提交**：`feat: add evidence-based evaluation and coaching`
 
-## Milestone 8：语音输入与代码白板
+## Milestone 9：语音输入与代码白板
 
-### Task 8.1：STT 抽象与音频上传
+### Task 9.1：STT 抽象与音频上传
 
 **文件**
 
@@ -646,7 +782,7 @@ interview_helper/
 - 转写结果先让用户确认，再作为 answer commit。
 - STT 不可用时文字输入完整可用。
 
-### Task 8.2：代码白板
+### Task 9.2：代码白板
 
 **文件**
 
@@ -662,9 +798,9 @@ interview_helper/
 
 **建议提交**：`feat: add confirmed speech input and code whiteboard`
 
-## Milestone 9：安全、可观测性与发布
+## Milestone 10：安全、可观测性与发布
 
-### Task 9.1：安全加固
+### Task 10.1：安全加固
 
 **文件**
 
@@ -679,7 +815,7 @@ interview_helper/
 - 限制 WebSocket 消息大小、连接频率和未确认消息数量。
 - 对简历、题目和模型内容明确数据边界，防止覆盖系统规则。
 
-### Task 9.2：日志与诊断
+### Task 10.2：日志与诊断
 
 **文件**
 
@@ -693,7 +829,7 @@ interview_helper/
 - 本地诊断展示数据库、worker、模型连接和文件目录状态。
 - 提供用户可复制的脱敏诊断包。
 
-### Task 9.3：端到端与发布文档
+### Task 10.3：端到端与发布文档
 
 **文件**
 
@@ -727,6 +863,7 @@ interview_helper/
 | REST API | route tests + service tests |
 | SSE/worker | job idempotency + reconnect tests |
 | WebSocket | protocol + sequence + reconnect tests |
+| 上下文/记忆 | token budget + compaction invariants + retrieval/deletion tests |
 | Planner/Evaluator | schema + fixture transcript tests |
 | UI 组件 | Vitest + Testing Library |
 | Precision Console | component tests + 4 viewport screenshots |
@@ -760,7 +897,11 @@ interview_helper/
 
 ### 题库、简历和风格同时进入上下文导致超限
 
-- Planner 先检索和压缩；实时面试只携带当前必要片段。
+- ContextBuilder 统一预算和裁剪；60/75/85/95% 分级压缩，当前题目、近期原文和未解决追问不可静默丢失。
+
+### 摘要漂移或长期记忆造成错误先验
+
+- 完整 transcript 保持事实源；摘要必须引用范围内证据，记忆可追溯且可冲突暂停；Evaluator 仍按题读取原文评分。
 
 ### UI 因信息多退化成卡片墙
 

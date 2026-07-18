@@ -7,6 +7,7 @@
 ## 文档
 
 - [产品与设计规格](docs/superpowers/specs/2026-07-18-interview-helper-product-design.md)
+- [上下文管理与记忆系统设计](docs/superpowers/specs/2026-07-18-context-memory-design.md)
 - [Phase 1 实施计划](docs/superpowers/plans/2026-07-18-interview-helper-phase1-implementation-plan.md)
 
 ## 已确认技术方向

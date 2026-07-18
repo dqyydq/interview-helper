@@ -286,6 +286,7 @@ MVP 支持 PDF、DOCX、Markdown 和纯文本。原始文件与解析文本均�
 
 - **Research Agent**：研究公司风格与整理来源。
 - **Planner Agent**：生成本场题目和时间计划。
+- **Context Summarizer**：按完整题目分段压缩历史对话。
 - **Interviewer Agent**：保持角色、提问、追问和控时。
 - **Evaluator Agent**：基于完整记录输出结构化证据和评级。
 - **Coach Agent**：解释报告，生成练习建议并回答复盘问题。
@@ -303,6 +304,32 @@ MVP 支持 PDF、DOCX、Markdown 和纯文本。原始文件与解析文本均�
 7. 时间与追问预算。
 
 题库参考答案只提供给 Evaluator，不直接暴露给 Interviewer，避免提示性追问。
+
+### 11.3 分层上下文管理
+
+完整 `InterviewMessage` 是不可变事实源，不直接把整场 transcript 重复发送给模型。实时上下文由唯一的 `ContextBuilder` 按以下层级组装：
+
+1. 系统安全规则、角色边界。
+2. 公司风格、轮次、InterviewPlan 和实时状态。
+3. 当前问题、未结束追问和近期原文。
+4. 已完成题目的结构化分段摘要。
+5. 按需检索的简历、题库和长期记忆。
+
+每个模型连接声明 context window、最大输出和 token 计数能力。系统预留输出与安全余量后计算有效输入预算，并在 60% 时预压缩、75% 时用摘要替换旧原文、85% 时减少低优先级检索内容、95% 时停止拼接并先完成强制压缩。当前问题、最近完整回答、未解决追问和系统规则永不被静默截断。
+
+每次重要模型调用保存 `ContextSnapshot`，记录实际纳入的消息、摘要、记忆和 token 分层统计，不默认重复保存完整 prompt 文本。
+
+### 11.4 结构化长期记忆
+
+跨场只保存项目事实、稳定技能、重复薄弱点、交互偏好和练习目标。每条记忆包含类型、来源消息、置信度、验证时间、状态和版本。
+
+- 用户明确陈述的项目事实和主动设置的偏好可以自动激活。
+- 能力和薄弱点首次出现只作为候选；至少两场独立证据支持后才自动激活。
+- 冲突值创建新版本并暂停自动使用，不静默覆盖。
+- 用户可以查看、编辑、确认、固定、拒绝、删除和按场遗忘。
+- MVP 使用 PostgreSQL JSONB、标签与全文检索；pgvector 只作为后续召回增强。
+
+详细规则见 [上下文管理与记忆系统设计规格](2026-07-18-context-memory-design.md)。
 
 ## 12. 面试评估
 
@@ -337,6 +364,8 @@ MVP 支持 PDF、DOCX、Markdown 和纯文本。原始文件与解析文本均�
 - 评价置信度。
 
 无证据时返回“证据不足”，不得补造用户说过的内容。
+
+Evaluator 按题读取对应完整原文和附件，先生成逐题评价，再进行能力聚合。实时压缩摘要只帮助面试连续性，不作为最终评级的唯一证据。
 
 ### 12.4 报告结构
 
@@ -399,7 +428,7 @@ ModelProvider
 - OpenAI-compatible：支持自定义 base URL、API key、模型名和额外请求头。
 - Anthropic-compatible：支持原生 Messages API 语义与自定义 endpoint。
 
-模型配置允许多个实例，并按 `researcher / planner / interviewer / evaluator / coach / embedding` 绑定角色。密钥不经前端回显，日志中始终脱敏。
+模型配置允许多个实例，并按 `researcher / planner / context_summarizer / interviewer / evaluator / coach / embedding` 绑定角色。Context Summarizer 未单独绑定时回退到 Planner。模型连接还要记录 context window、最大输出 token 和 token 计数能力。密钥不经前端回显，日志中始终脱敏。
 
 ## 14. 数据模型
 
@@ -411,6 +440,8 @@ ModelProvider
 - `QuestionBank`、`Question`、`QuestionVariant`、`QuestionTag`。
 - `InterviewConfig`、`InterviewPlan`、`PlanQuestion`。
 - `InterviewSession`、`InterviewMessage`、`AnswerAttachment`。
+- `InterviewContextState`、`ConversationSegment`、`ContextSummary`、`ContextSnapshot`。
+- `MemoryItem`、`MemorySource`、`MemoryConflict`、`MemoryUsage`。
 - `EvaluationReport`、`QuestionEvaluation`、`DimensionEvaluation`。
 - `ModelConnection`、`ModelRoleBinding`。
 - `BackgroundJob`。
@@ -430,6 +461,12 @@ ModelProvider
 - `POST /api/interviews/plan`
 - `GET /api/interviews/{id}`
 - `GET /api/reports/{id}`
+- `GET /api/interviews/{id}/context/diagnostics`
+- `GET /api/interviews/{id}/memory-preview`
+- `GET /api/memories`
+- `PATCH /api/memories/{id}`
+- `DELETE /api/memories/{id}`
+- `POST /api/interviews/{id}/forget`
 - `POST /api/model-connections/test`
 
 ### 15.2 SSE 示例
@@ -587,6 +624,8 @@ ModelProvider
 - 模型 API key 仅在后端使用，日志和错误信息脱敏。
 - 本地部署支持环境变量或系统密钥存储；数据库中保存时必须加密。
 - 简历、面试记录和报告提供单项删除与全部清除。
+- 摘要、上下文快照和长期记忆遵循与原始会话相同的数据隔离与删除边界。
+- 用户可以关闭跨场记忆、预览本场使用的记忆，并按条目或按会话遗忘。
 - 外部链接抓取使用域名与网络地址校验，禁止访问回环、内网和云元数据地址。
 - 外部网页、简历、题库内容均作为不可信数据，不能覆盖系统规则。
 - 上传文件校验 MIME、扩展名、体积和解析超时。
@@ -600,6 +639,9 @@ ModelProvider
 - WebSocket 断开：顶部显示非阻塞连接状态，自动重连并按序号补发。
 - 风格研究失败：保留已提取证据和错误原因，允许重新运行或手动编辑。
 - 评估结构化输出不合法：后端执行有限次数修复；仍失败则记录原始错误并允许换模型重评。
+- token 统计失败：使用带安全余量的保守估算，不把未知值视为零。
+- 上下文压缩失败：保留原文并重试；仍超限时停止本次模型调用，不静默截断。
+- 长期记忆冲突：暂停使用冲突条目，等待用户确认。
 
 ## 19. 测试策略
 
@@ -611,6 +653,8 @@ ModelProvider
 - 模型适配器契约测试，使用录制响应或模拟服务器。
 - WebSocket 序号、断线恢复和幂等提交测试。
 - 评估证据必须引用真实消息的约束测试。
+- ContextBuilder token 预算、压缩阈值、摘要证据范围和快照测试。
+- 长期记忆状态迁移、冲突、过期、检索和按场遗忘测试。
 - SSRF、文件类型、提示注入隔离和密钥脱敏测试。
 
 ### 19.2 前端
@@ -619,6 +663,7 @@ ModelProvider
 - 配置联动与禁用状态。
 - 面试房间断线恢复。
 - 报告证据定位。
+- 记忆预览、编辑、固定、删除和按场遗忘。
 - 1440、1024、768 和 390px 视口视觉回归。
 - 对比度、焦点顺序、语义标签和 reduced-motion 检查。
 
@@ -630,6 +675,8 @@ ModelProvider
 4. 评估报告的每个评级都能定位到真实回答证据。
 5. 用户添加新公司、审阅 Agent 草案并启用自定义轮次。
 6. 没有 pgvector、Redis 或云账户时，核心流程仍可本地运行。
+7. 60 分钟长面试在小上下文模型上多次压缩后，当前问题和未解决追问仍完整。
+8. 第二场面试只复用已确认的结构化记忆，删除后不再召回。
 
 ## 20. MVP 分期
 
@@ -641,6 +688,7 @@ ModelProvider
 - 多模型配置。
 - 文本与语音输入、文字回复。
 - 实时面试、代码白板。
+- 分层上下文、按题摘要、token 诊断和结构化长期记忆。
 - 证据化报告。
 - Precision Console 首页。
 
@@ -666,9 +714,10 @@ Phase 1 不是一个不可分割的大任务。实施计划应按以下边界拆
 1. **基础设施**：FastAPI、React、PostgreSQL、迁移、配置、模型连接测试。
 2. **内容与上下文**：手动题库、简历上传解析、公司与轮次模板。
 3. **面试计划**：能力矩阵、选题编排、InterviewPlan 预览与确认。
-4. **实时引擎**：WebSocket 会话、文字输入、STT 接入、代码白板、断线恢复。
-5. **评估与报告**：结构化评估、证据定位、报告与复盘教练。
-6. **Precision Console**：首页、准备页和核心导航的视觉实现与响应式验收。
+4. **上下文与记忆**：TokenBudget、分段摘要、ContextSnapshot、长期记忆与用户控制。
+5. **实时引擎**：WebSocket 会话、文字输入、STT 接入、代码白板、断线恢复。
+6. **评估与报告**：按题评估、证据定位、报告与复盘教练。
+7. **Precision Console**：首页、准备页和核心导航的视觉实现与响应式验收。
 
 后一个切分可以依赖前一个切分的公开接口，但不直接依赖其内部实现。公司研究 Agent、链接导入和社区发布不得提前混入 Phase 1。
 
@@ -684,6 +733,8 @@ Phase 1 不是一个不可分割的大任务。实施计划应按以下边界拆
 - 实时房间使用 WebSocket；后台流式任务使用 SSE；普通操作使用 REST。
 - 同时支持 OpenAI-compatible 与 Anthropic-compatible 模型协议。
 - 代码白板进入 MVP，但不执行代码。
+- 采用分层上下文；完整 transcript 是事实源，按完整题目生成结构化摘要。
+- 跨场只保存可追溯、可管理的结构化记忆，MVP 不强依赖 pgvector。
 - 视觉方向采用 Precision Console，不采用暖白 Anthropic 式编辑风。
 
 ## 22. 实施前评审门槛
