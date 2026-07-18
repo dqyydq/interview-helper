@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     )
     database_echo: bool = False
     database_connect_timeout_seconds: float = Field(default=2.0, ge=0.1, le=30.0)
+    encryption_secret: str = Field(
+        default="local-development-only-change-me",
+        min_length=16,
+        repr=False,
+    )
 
 
 @lru_cache

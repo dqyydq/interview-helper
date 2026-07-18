@@ -59,6 +59,10 @@ python -m alembic current
 
 Docker 首次初始化会同时创建 `interview_helper` 与 `interview_helper_test`。pytest 只连接测试数据库，并在测试开始前自动升级迁移。
 
+### 模型连接
+
+打开 `http://localhost:5173/settings` 可添加 OpenAI-compatible 或 Anthropic-compatible 模型连接，并分别绑定面试官、评估官等 Agent 角色。API Key 与额外请求头使用 `INTERVIEW_HELPER_ENCRYPTION_SECRET` 在本地后端加密，读取接口不会返回密钥；正式使用前请在 `.env` 中替换示例加密密钥。
+
 ### 4. 安装并启动前端
 
 ```powershell

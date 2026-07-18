@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.providers.base import ProviderError
+
 logger = structlog.get_logger(__name__)
 
 
@@ -144,9 +146,21 @@ async def unknown_error_handler(request: Request, exc: Exception) -> JSONRespons
     )
 
 
+async def provider_error_handler(request: Request, exc: ProviderError) -> JSONResponse:
+    status_code = 503 if exc.retryable else 502
+    return _response(
+        request=request,
+        code=exc.code,
+        message=exc.message,
+        status_code=status_code,
+        retryable=exc.retryable,
+    )
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, app_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(RequestValidationError, validation_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(IntegrityError, integrity_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(ProviderError, provider_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(StarletteHTTPException, http_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, unknown_error_handler)

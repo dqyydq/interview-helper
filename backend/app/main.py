@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +18,16 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await dispose_engine()
 
 
+def frontend_origins() -> list[str]:
+    configured = str(settings.frontend_origin).rstrip("/")
+    origins = {configured}
+    if settings.environment in {"local", "test"}:
+        parsed = urlsplit(configured)
+        port = f":{parsed.port}" if parsed.port else ""
+        origins.update({f"{parsed.scheme}://localhost{port}", f"{parsed.scheme}://127.0.0.1{port}"})
+    return sorted(origins)
+
+
 def create_app() -> FastAPI:
     application = FastAPI(
         title=settings.app_name,
@@ -26,7 +37,7 @@ def create_app() -> FastAPI:
     )
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=[str(settings.frontend_origin).rstrip("/")],
+        allow_origins=frontend_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

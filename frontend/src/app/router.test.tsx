@@ -1,8 +1,25 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { RouterProvider } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createTestRouter } from "./router";
+
+vi.mock("../features/settings/models/api", () => ({
+  modelConnectionApi: {
+    list: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+    remove: vi.fn(),
+    test: vi.fn(),
+    listBindings: vi.fn().mockResolvedValue([]),
+    bindRole: vi.fn(),
+    readiness: vi.fn().mockResolvedValue({
+      ready: false,
+      missing_roles: ["interviewer", "evaluator"],
+      degraded_roles: [],
+    }),
+  },
+}));
 
 const routes = [
   ["/interviews", "模拟面试"],
@@ -12,23 +29,25 @@ const routes = [
 ] as const;
 
 describe("application routes", () => {
-  it.each(routes)("renders %s", (path, heading) => {
-    render(
-      <RouterProvider
-        router={createTestRouter([path])}
-        future={{ v7_startTransition: true }}
-      />,
+  const renderRoute = (path: string) => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider
+          router={createTestRouter([path])}
+          future={{ v7_startTransition: true }}
+        />
+      </QueryClientProvider>,
     );
+  };
+
+  it.each(routes)("renders %s", (path, heading) => {
+    renderRoute(path);
     expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
   });
 
   it("renders a safe not-found page", () => {
-    render(
-      <RouterProvider
-        router={createTestRouter(["/not-a-real-route"])}
-        future={{ v7_startTransition: true }}
-      />,
-    );
+    renderRoute("/not-a-real-route");
     expect(screen.getByRole("heading", { name: "页面不存在" })).toBeInTheDocument();
     expect(screen.queryByText(/stack|exception|traceback/i)).not.toBeInTheDocument();
   });

@@ -2,7 +2,6 @@ import {
   BookOpen,
   FileBarChart,
   MessagesSquare,
-  Settings,
 } from "lucide-react";
 import {
   Navigate,
@@ -12,6 +11,7 @@ import {
   type RouteObject,
 } from "react-router-dom";
 
+import { ModelSettingsPage } from "../features/settings/models/ModelSettingsPage";
 import { EmptyStatePage } from "../pages/EmptyStatePage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { AppShell } from "./shell/AppShell";
@@ -61,14 +61,7 @@ export const appRoutes: RouteObject[] = [
       },
       {
         path: "settings",
-        element: (
-          <EmptyStatePage
-            eyebrow="LOCAL CONTROL"
-            title="系统设置"
-            description="模型连接、数据与记忆控制会集中在这里。"
-            icon={Settings}
-          />
-        ),
+        element: <ModelSettingsPage />,
       },
       { path: "*", element: <NotFoundPage /> },
     ],
