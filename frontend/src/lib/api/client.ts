@@ -1,20 +1,21 @@
 import { decodeApiError } from "./errors";
 
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api").replace(
+export const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api").replace(
   /\/$/,
   "",
 );
 
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const requestId = crypto.randomUUID();
+  const headers = new Headers(init.headers);
+  headers.set("Accept", "application/json");
+  headers.set("X-Request-ID", requestId);
+  if (!(init.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      "X-Request-ID": requestId,
-      ...init.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -25,4 +26,8 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     return undefined as T;
   }
   return (await response.json()) as T;
+}
+
+export function apiUrl(path: string) {
+  return `${apiBaseUrl}${path}`;
 }

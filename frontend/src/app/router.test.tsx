@@ -21,8 +21,27 @@ vi.mock("../features/settings/models/api", () => ({
   },
 }));
 
+vi.mock("../features/interviews/companies/api", () => ({
+  companyApi: {
+    list: vi.fn().mockResolvedValue([]),
+    create: vi.fn(),
+  },
+}));
+
+vi.mock("../features/knowledge/api", () => ({
+  knowledgeApi: {
+    listBanks: vi.fn().mockResolvedValue([]),
+    createBank: vi.fn(),
+    listQuestions: vi.fn().mockResolvedValue({ data: [], count: 0, offset: 0, limit: 100 }),
+    createQuestion: vi.fn(),
+    archiveQuestion: vi.fn(),
+    listResumes: vi.fn().mockResolvedValue([]),
+    uploadResume: vi.fn(),
+  },
+}));
+
 const routes = [
-  ["/interviews", "模拟面试"],
+  ["/interviews", "选择公司"],
   ["/questions", "面试知识库"],
   ["/reports", "评估报告"],
   ["/settings", "系统设置"],

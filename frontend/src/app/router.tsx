@@ -1,7 +1,5 @@
 import {
-  BookOpen,
   FileBarChart,
-  MessagesSquare,
 } from "lucide-react";
 import {
   Navigate,
@@ -12,6 +10,8 @@ import {
 } from "react-router-dom";
 
 import { ModelSettingsPage } from "../features/settings/models/ModelSettingsPage";
+import { CompanySelectionPage } from "../features/interviews/companies/CompanySelectionPage";
+import { KnowledgeBasePage } from "../features/knowledge/KnowledgeBasePage";
 import { EmptyStatePage } from "../pages/EmptyStatePage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { AppShell } from "./shell/AppShell";
@@ -28,25 +28,11 @@ export const appRoutes: RouteObject[] = [
       { index: true, element: <Navigate replace to="/interviews" /> },
       {
         path: "interviews",
-        element: (
-          <EmptyStatePage
-            eyebrow="SIMULATION DESK"
-            title="模拟面试"
-            description="公司、轮次与岗位配置将在下一里程碑接入。"
-            icon={MessagesSquare}
-          />
-        ),
+        element: <CompanySelectionPage />,
       },
       {
         path: "questions",
-        element: (
-          <EmptyStatePage
-            eyebrow="KNOWLEDGE BASE"
-            title="面试知识库"
-            description="题库管理与手动录入将在领域模型完成后开放。"
-            icon={BookOpen}
-          />
-        ),
+        element: <KnowledgeBasePage />,
       },
       {
         path: "reports",
