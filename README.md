@@ -49,6 +49,16 @@ python -m uvicorn app.main:app --reload
 
 健康检查地址为 `http://localhost:8000/api/health`。PostgreSQL 不可用时进程仍能启动，并返回 `degraded`。
 
+数据库结构由 Alembic 管理：
+
+```powershell
+Set-Location backend
+python -m alembic upgrade head
+python -m alembic current
+```
+
+Docker 首次初始化会同时创建 `interview_helper` 与 `interview_helper_test`。pytest 只连接测试数据库，并在测试开始前自动升级迁移。
+
 ### 4. 安装并启动前端
 
 ```powershell
