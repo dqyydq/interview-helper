@@ -63,6 +63,25 @@ Docker 首次初始化会同时创建 `interview_helper` 与 `interview_helper_t
 
 打开 `http://localhost:5173/settings` 可添加 OpenAI-compatible 或 Anthropic-compatible 模型连接，并分别绑定面试官、评估官等 Agent 角色。API Key 与额外请求头使用 `INTERVIEW_HELPER_ENCRYPTION_SECRET` 在本地后端加密，读取接口不会返回密钥；正式使用前请在 `.env` 中替换示例加密密钥。
 
+### 公司骨架与后台任务
+
+首次迁移后可安全地导入六家公司轮次骨架。骨架不包含未经验证的公司风格结论，重复执行不会产生重复版本：
+
+```powershell
+Set-Location backend
+python -m app.cli.seed_companies
+```
+
+简历上传后会写入 PostgreSQL 任务队列。开发环境需另开一个终端启动 worker；任务进度由 API 通过 SSE 提供：
+
+```powershell
+. .\.venv\Scripts\Activate.ps1
+Set-Location backend
+python -m app.workers.run
+```
+
+支持 PDF、DOCX、Markdown 与 TXT，默认上限为 5 MB。上传文件保存在 `data/uploads`，该目录不会进入 Git。
+
 ### 4. 安装并启动前端
 
 ```powershell
