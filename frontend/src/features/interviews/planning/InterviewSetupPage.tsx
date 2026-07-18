@@ -16,6 +16,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { knowledgeApi } from "../../knowledge/api";
 import { companyApi } from "../companies/api";
 import { planningApi } from "./api";
+import { liveInterviewApi } from "../live/api";
 import type { InterviewPlan, PlanDraft, PlanJob } from "./types";
 
 const sourceLabels: Record<string, string> = {
@@ -83,6 +84,10 @@ export function InterviewSetupPage() {
         }
       });
     },
+  });
+  const createSession = useMutation({
+    mutationFn: liveInterviewApi.create,
+    onSuccess: (created) => navigate(`/interviews/${created.id}/live`),
   });
 
   const toggleBank = (bankId: string) => {
@@ -284,8 +289,13 @@ export function InterviewSetupPage() {
               {isPlanning ? "正在生成计划" : "生成面试计划"}
             </button>
           ) : (
-            <button className="primary-button" type="button" disabled title="实时会话正在接入">
-              计划已就绪 · 会话接入中
+            <button
+              className="primary-button"
+              type="button"
+              disabled={createSession.isPending}
+              onClick={() => plan && createSession.mutate(plan.id)}
+            >
+              {createSession.isPending ? "正在创建房间" : "开始模拟面试"}
             </button>
           )}
         </footer>

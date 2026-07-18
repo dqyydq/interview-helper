@@ -9,6 +9,7 @@ from app.db.models.interview import (
     InterviewConfig,
     InterviewMessage,
     InterviewPlan,
+    InterviewRealtimeEvent,
     InterviewSession,
     PlanQuestion,
 )
@@ -16,12 +17,14 @@ from app.db.models.job import BackgroundJob
 from app.db.models.question import Question, QuestionBank, QuestionTagLink
 from app.db.session import async_session_factory, engine
 from app.main import app
+from app.realtime.event_store import append_event, find_client_event, replay_events
 from app.workers.plan_jobs import run_once as run_plan_once
 
 
 async def clear_planning_data() -> None:
     async with async_session_factory() as session:
         await session.execute(delete(BackgroundJob))
+        await session.execute(delete(InterviewRealtimeEvent))
         await session.execute(delete(InterviewMessage))
         await session.execute(delete(ConversationSegment))
         await session.execute(delete(InterviewContextState))
@@ -143,6 +146,29 @@ async def test_plan_job_builds_traceable_ready_plan() -> None:
     assert resumed.json()["status"] == "interviewing"
     assert finished.json()["status"] == "completed"
     assert finished_again.json()["ended_at"] == finished.json()["ended_at"]
+
+    async with async_session_factory() as database:
+        interview = await database.get(InterviewSession, session_id)
+        assert interview is not None
+        first_event = await append_event(
+            database,
+            interview,
+            event_type="input.ack",
+            payload={"message_id": "message-1"},
+            client_event_id="client-event-1",
+        )
+        await append_event(
+            database,
+            interview,
+            event_type="assistant.message",
+            payload={"message_id": "message-2"},
+        )
+        duplicate = await find_client_event(database, interview.id, "client-event-1")
+        replay = await replay_events(database, interview.id, first_event.sequence)
+
+    assert duplicate is not None
+    assert duplicate.event_id == first_event.event_id
+    assert [event.type for event in replay] == ["assistant.message"]
 
 
 @pytest.mark.asyncio

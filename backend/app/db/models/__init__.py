@@ -18,6 +18,7 @@ from app.db.models.interview import (
     InterviewConfig,
     InterviewMessage,
     InterviewPlan,
+    InterviewRealtimeEvent,
     InterviewSession,
     PlanQuestion,
 )
@@ -49,6 +50,7 @@ __all__ = [
     "InterviewContextState",
     "InterviewMessage",
     "InterviewPlan",
+    "InterviewRealtimeEvent",
     "InterviewSession",
     "MemoryConflict",
     "MemoryItem",

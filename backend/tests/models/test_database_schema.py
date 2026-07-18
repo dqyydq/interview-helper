@@ -42,7 +42,7 @@ async def test_all_metadata_tables_exist_in_postgresql() -> None:
         )
 
     assert set(SQLModel.metadata.tables) <= database_tables
-    assert len(SQLModel.metadata.tables) == 34
+    assert len(SQLModel.metadata.tables) == 35
 
 
 @pytest.mark.asyncio

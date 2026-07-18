@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.errors import register_error_handlers
 from app.api.main import api_router
 from app.api.middleware import RequestIdMiddleware
+from app.api.routes.interview_live import router as interview_live_router
 from app.core.config import settings
 from app.db.session import dispose_engine
 
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     )
     application.add_middleware(RequestIdMiddleware)
     application.include_router(api_router, prefix=settings.api_prefix)
+    application.include_router(interview_live_router, prefix=settings.api_prefix)
     register_error_handlers(application)
     return application
 

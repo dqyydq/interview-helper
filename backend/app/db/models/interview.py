@@ -158,6 +158,26 @@ class InterviewMessage(EntityBase, table=True):
     message_metadata: dict = Field(default_factory=dict, sa_type=JSONB, nullable=False)
 
 
+class InterviewRealtimeEvent(EntityBase, table=True):
+    __tablename__ = "interview_realtime_events"
+    __table_args__ = (
+        UniqueConstraint("session_id", "sequence", name="uq_realtime_event_sequence"),
+        UniqueConstraint("session_id", "event_id", name="uq_realtime_event_id"),
+        UniqueConstraint("session_id", "client_event_id", name="uq_realtime_client_event_id"),
+    )
+
+    session_id: uuid.UUID = Field(
+        foreign_key="interview_sessions.id",
+        ondelete="CASCADE",
+        index=True,
+    )
+    event_id: uuid.UUID = Field(default_factory=uuid.uuid4, index=True)
+    client_event_id: str | None = Field(default=None, max_length=120, index=True)
+    sequence: int = Field(ge=1)
+    event_type: str = Field(min_length=1, max_length=80, index=True)
+    payload: dict = Field(default_factory=dict, sa_type=JSONB, nullable=False)
+
+
 class AnswerAttachment(EntityBase, table=True):
     __tablename__ = "answer_attachments"
 

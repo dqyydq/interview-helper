@@ -12,6 +12,7 @@ import {
 import { ModelSettingsPage } from "../features/settings/models/ModelSettingsPage";
 import { CompanySelectionPage } from "../features/interviews/companies/CompanySelectionPage";
 import { InterviewSetupPage } from "../features/interviews/planning/InterviewSetupPage";
+import { LiveInterviewPage } from "../features/interviews/live/LiveInterviewPage";
 import { KnowledgeBasePage } from "../features/knowledge/KnowledgeBasePage";
 import { EmptyStatePage } from "../pages/EmptyStatePage";
 import { NotFoundPage } from "../pages/NotFoundPage";
@@ -34,6 +35,10 @@ export const appRoutes: RouteObject[] = [
       {
         path: "interviews/setup",
         element: <InterviewSetupPage />,
+      },
+      {
+        path: "interviews/:sessionId/live",
+        element: <LiveInterviewPage />,
       },
       {
         path: "questions",
