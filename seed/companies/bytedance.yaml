@@ -1,0 +1,15 @@
+seed_version: 1
+name: 字节跳动
+slug: bytedance
+description: 系统预置公司骨架；具体面试风格尚未研究，不代表官方结论。
+style_pack:
+  name: 通用轮次骨架
+  status: active
+  visibility: private
+  supported_roles: [llm_application_engineer]
+  default_interviewer_behavior: {}
+  field_confidence: {}
+  rounds:
+    - {round_key: round_1, name: 一面, sequence: 1, duration_minutes: 45}
+    - {round_key: round_2, name: 二面, sequence: 2, duration_minutes: 45}
+    - {round_key: round_3, name: 三面, sequence: 3, duration_minutes: 45}

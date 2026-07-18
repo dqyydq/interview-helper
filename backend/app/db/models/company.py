@@ -11,6 +11,12 @@ from app.db.models.common import ContentStatus, EntityBase, Visibility, utc_now
 class Company(EntityBase, table=True):
     __tablename__ = "companies"
 
+    profile_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="user_profiles.id",
+        ondelete="CASCADE",
+        index=True,
+    )
     name: str = Field(min_length=1, max_length=160, index=True)
     slug: str = Field(min_length=1, max_length=180, unique=True, index=True)
     description: str | None = Field(default=None, max_length=10_000, sa_type=Text)
@@ -47,6 +53,7 @@ class RoundProfile(EntityBase, table=True):
     __tablename__ = "round_profiles"
     __table_args__ = (
         UniqueConstraint("style_pack_id", "round_key", name="uq_round_profile_key"),
+        UniqueConstraint("style_pack_id", "sequence", name="uq_round_profile_sequence"),
     )
 
     style_pack_id: uuid.UUID = Field(

@@ -57,10 +57,18 @@ async def test_database_contains_critical_unique_constraints() -> None:
         memory_constraints = await connection.run_sync(
             lambda sync_connection: _unique_names(sync_connection, "memory_items")
         )
+        round_constraints = await connection.run_sync(
+            lambda sync_connection: _unique_names(sync_connection, "round_profiles")
+        )
+        resume_constraints = await connection.run_sync(
+            lambda sync_connection: _unique_names(sync_connection, "resumes")
+        )
 
     assert "uq_interview_message_sequence" in message_constraints
     assert "ix_background_jobs_idempotency_key" in job_constraints
     assert "uq_memory_item_version" in memory_constraints
+    assert "uq_round_profile_sequence" in round_constraints
+    assert "uq_resume_profile_hash" in resume_constraints
 
 
 @pytest.mark.asyncio
@@ -78,8 +86,12 @@ async def test_database_foreign_keys_preserve_history_and_privacy_boundaries() -
         memory_source_actions = await connection.run_sync(
             lambda sync_connection: _foreign_key_actions(sync_connection, "memory_sources")
         )
+        company_actions = await connection.run_sync(
+            lambda sync_connection: _foreign_key_actions(sync_connection, "companies")
+        )
 
     assert plan_question_actions["question_id"] == "RESTRICT"
     assert config_actions["resume_id"] == "SET NULL"
     assert message_actions["session_id"] == "CASCADE"
     assert memory_source_actions["session_id"] == "CASCADE"
+    assert company_actions["profile_id"] == "CASCADE"

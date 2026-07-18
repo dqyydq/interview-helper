@@ -9,6 +9,9 @@ from app.db.models.common import EntityBase, ResumeParseStatus
 
 class Resume(EntityBase, table=True):
     __tablename__ = "resumes"
+    __table_args__ = (
+        UniqueConstraint("profile_id", "content_hash", name="uq_resume_profile_hash"),
+    )
 
     profile_id: uuid.UUID = Field(
         foreign_key="user_profiles.id",
