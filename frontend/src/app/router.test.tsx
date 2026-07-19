@@ -21,6 +21,14 @@ vi.mock("../features/settings/models/api", () => ({
   },
 }));
 
+vi.mock("../features/settings/memory/api", () => ({
+  memoryApi: {
+    list: vi.fn().mockResolvedValue([]),
+    settings: vi.fn().mockResolvedValue({ memory_enabled: true }),
+    updateSettings: vi.fn(),
+  },
+}));
+
 vi.mock("../features/interviews/companies/api", () => ({
   companyApi: {
     list: vi.fn().mockResolvedValue([]),
@@ -45,6 +53,7 @@ const routes = [
   ["/questions", "面试知识库"],
   ["/reports", "评估报告"],
   ["/settings", "系统设置"],
+  ["/settings/memory", "长期记忆"],
 ] as const;
 
 describe("application routes", () => {

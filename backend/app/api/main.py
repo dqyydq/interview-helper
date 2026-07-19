@@ -5,6 +5,7 @@ from app.api.routes import (
     health,
     interview_plans,
     interview_sessions,
+    memories,
     model_connections,
     questions,
     resumes,
@@ -18,3 +19,4 @@ api_router.include_router(questions.router)
 api_router.include_router(resumes.router)
 api_router.include_router(interview_plans.router)
 api_router.include_router(interview_sessions.router)
+api_router.include_router(memories.router)

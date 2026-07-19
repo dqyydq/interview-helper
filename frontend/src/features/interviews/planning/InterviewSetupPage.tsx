@@ -6,6 +6,7 @@ import {
   FileText,
   Gauge,
   LoaderCircle,
+  MemoryStick,
   ShieldCheck,
   Sparkles,
   Target,
@@ -47,6 +48,7 @@ export function InterviewSetupPage() {
   const eventSourceRef = useRef<EventSource | null>(null);
   const [plan, setPlan] = useState<InterviewPlan>();
   const [job, setJob] = useState<PlanJob>();
+  const [excludedMemoryIds, setExcludedMemoryIds] = useState<string[]>([]);
   const [form, setForm] = useState<Omit<PlanDraft, "company_id" | "round_profile_id">>({
     role_name: "llm_application_engineer",
     duration_minutes: 45,
@@ -105,6 +107,15 @@ export function InterviewSetupPage() {
   );
   const isPlanning = job?.status === "queued" || job?.status === "running";
   const isReady = plan?.status === "ready";
+  const memoryPreview = useQuery({
+    queryKey: ["interview-memory-preview", plan?.id],
+    queryFn: () => planningApi.memoryPreview(plan!.id),
+    enabled: isReady,
+  });
+
+  useEffect(() => {
+    setExcludedMemoryIds([]);
+  }, [plan?.id]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -270,6 +281,31 @@ export function InterviewSetupPage() {
                   ))}
                 </div>
               </section>
+              <section className="plan-memory-preview">
+                <h3><MemoryStick size={13} /> 本场长期记忆</h3>
+                {!memoryPreview.data?.enabled && <p className="memory-preview-muted">跨场记忆当前已关闭</p>}
+                {memoryPreview.data?.enabled && memoryPreview.data.items.length === 0 && (
+                  <p className="memory-preview-muted">本场没有匹配到长期记忆</p>
+                )}
+                {memoryPreview.data?.items.map((memory) => {
+                  const included = !excludedMemoryIds.includes(memory.id);
+                  return (
+                    <label className="plan-memory-item" key={memory.id}>
+                      <input
+                        type="checkbox"
+                        checked={included}
+                        onChange={() => setExcludedMemoryIds((current) =>
+                          included ? [...current, memory.id] : current.filter((id) => id !== memory.id)
+                        )}
+                      />
+                      <span>{memory.content}</span>
+                    </label>
+                  );
+                })}
+                {memoryPreview.data?.enabled && memoryPreview.data.items.length > 0 && (
+                  <small>取消勾选只对本场生效，不会修改长期记忆。</small>
+                )}
+              </section>
             </div>
           )}
           <div className="plan-policy">
@@ -293,7 +329,7 @@ export function InterviewSetupPage() {
               className="primary-button"
               type="button"
               disabled={createSession.isPending}
-              onClick={() => plan && createSession.mutate(plan.id)}
+              onClick={() => plan && createSession.mutate({ planId: plan.id, excludedMemoryIds })}
             >
               {createSession.isPending ? "正在创建房间" : "开始模拟面试"}
             </button>

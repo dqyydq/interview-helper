@@ -10,6 +10,7 @@ import {
 } from "react-router-dom";
 
 import { ModelSettingsPage } from "../features/settings/models/ModelSettingsPage";
+import { MemorySettingsPage } from "../features/settings/memory/MemorySettingsPage";
 import { CompanySelectionPage } from "../features/interviews/companies/CompanySelectionPage";
 import { InterviewSetupPage } from "../features/interviews/planning/InterviewSetupPage";
 import { LiveInterviewPage } from "../features/interviews/live/LiveInterviewPage";
@@ -58,6 +59,10 @@ export const appRoutes: RouteObject[] = [
       {
         path: "settings",
         element: <ModelSettingsPage />,
+      },
+      {
+        path: "settings/memory",
+        element: <MemorySettingsPage />,
       },
       { path: "*", element: <NotFoundPage /> },
     ],

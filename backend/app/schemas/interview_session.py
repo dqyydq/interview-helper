@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime
 
+from pydantic import Field
+
 from app.db.models.common import MessageRole, SessionStatus
 from app.schemas.common import ApiModel, EntityPublic
 from app.schemas.interview_plan import InterviewPlanPublic
@@ -8,6 +10,7 @@ from app.schemas.interview_plan import InterviewPlanPublic
 
 class InterviewSessionCreate(ApiModel):
     plan_id: uuid.UUID
+    excluded_memory_ids: list[uuid.UUID] = Field(default_factory=list)
 
 
 class InterviewMessagePublic(EntityPublic):

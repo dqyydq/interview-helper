@@ -150,7 +150,7 @@ async def build_interviewer_context(
     state_text, included_refs = await _load_style_state(session, interview, current, context)
     plan = await session.get(InterviewPlan, interview.plan_id)
     config = await session.get(InterviewConfig, plan.config_id) if plan else None
-    memory_hits = await retrieve_memories(
+    retrieved_memory_hits = await retrieve_memories(
         session,
         profile_id=interview.profile_id,
         agent_role=ModelRole.INTERVIEWER,
@@ -159,6 +159,12 @@ async def build_interviewer_context(
         role_name=config.role_name if config else None,
         limit=8,
     )
+    user_excluded_memory_ids = {
+        str(item) for item in context.state_payload.get("excluded_memory_ids", [])
+    }
+    memory_hits = [
+        hit for hit in retrieved_memory_hits if str(hit.memory.id) not in user_excluded_memory_ids
+    ]
 
     all_messages = list(
         (
@@ -349,6 +355,15 @@ async def build_interviewer_context(
         }
         for hit in memory_hits
         if hit.memory.id not in selected_memory_ids
+    )
+    excluded_refs.extend(
+        {
+            "type": "memory",
+            "id": str(hit.memory.id),
+            "reason": "user_excluded",
+        }
+        for hit in retrieved_memory_hits
+        if str(hit.memory.id) in user_excluded_memory_ids
     )
     snapshot = ContextSnapshot(
         session_id=interview.id,

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
+import { SettingsTabs } from "../SettingsTabs";
 import { modelConnectionApi } from "./api";
 import {
   modelRoles,
@@ -129,6 +130,8 @@ export function ModelSettingsPage() {
           </span>
         </div>
       </header>
+
+      <SettingsTabs />
 
       {error instanceof Error && <p className="settings-error">{error.message}</p>}
 

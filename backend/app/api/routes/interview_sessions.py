@@ -20,7 +20,12 @@ async def create_interview_session(
     session: SessionDep,
 ) -> InterviewSessionPublic:
     profile = await ensure_local_profile(session)
-    interview = await service.create_session(session, profile.id, payload.plan_id)
+    interview = await service.create_session(
+        session,
+        profile.id,
+        payload.plan_id,
+        excluded_memory_ids=payload.excluded_memory_ids,
+    )
     return await service.session_public(session, interview)
 
 

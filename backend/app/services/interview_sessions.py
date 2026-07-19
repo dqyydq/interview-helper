@@ -177,6 +177,8 @@ async def create_session(
     session: AsyncSession,
     profile_id: uuid.UUID,
     plan_id: uuid.UUID,
+    *,
+    excluded_memory_ids: list[uuid.UUID] | None = None,
 ) -> InterviewSession:
     plan = await session.scalar(
         select(InterviewPlan)
@@ -218,7 +220,11 @@ async def create_session(
         InterviewContextState(
             session_id=interview.id,
             current_plan_question_id=questions[0].id,
-            state_payload={"phase": "ready", "plan_version": plan.version},
+            state_payload={
+                "phase": "ready",
+                "plan_version": plan.version,
+                "excluded_memory_ids": [str(item) for item in (excluded_memory_ids or [])],
+            },
         )
     )
     await session.commit()

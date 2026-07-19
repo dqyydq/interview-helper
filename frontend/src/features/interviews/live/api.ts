@@ -14,9 +14,9 @@ export interface InterviewSession {
 }
 
 export const liveInterviewApi = {
-  create: (planId: string) => apiRequest<InterviewSession>("/interview-sessions", {
+  create: ({ planId, excludedMemoryIds = [] }: { planId: string; excludedMemoryIds?: string[] }) => apiRequest<InterviewSession>("/interview-sessions", {
     method: "POST",
-    body: JSON.stringify({ plan_id: planId }),
+    body: JSON.stringify({ plan_id: planId, excluded_memory_ids: excludedMemoryIds }),
   }),
   start: (sessionId: string) => apiRequest<InterviewSession>(`/interview-sessions/${sessionId}/start`, {
     method: "POST",
