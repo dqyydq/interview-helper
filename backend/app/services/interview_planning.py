@@ -262,6 +262,7 @@ async def generate_plan(session: AsyncSession, plan_id: uuid.UUID) -> InterviewP
         )
     plan.status = PlanStatus.READY
     plan.plan_snapshot = {
+        **plan.plan_snapshot,
         "phase": "ready",
         "planner": "deterministic-v1",
         "role_matrix": role_matrix.role_key,

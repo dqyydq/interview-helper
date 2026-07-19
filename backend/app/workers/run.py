@@ -6,6 +6,7 @@ import anyio
 from app.core.config import settings
 from app.db.session import dispose_engine
 from app.workers.context_summary_jobs import run_once as run_summary_once
+from app.workers.evaluation_jobs import run_once as run_evaluation_once
 from app.workers.plan_jobs import run_once as run_plan_once
 from app.workers.resume_jobs import run_once as run_resume_once
 
@@ -20,7 +21,9 @@ async def async_main(once: bool) -> None:
     worker_id = f"local-{uuid.uuid4().hex[:10]}"
     try:
         while True:
-            processed = await run_summary_once(worker_id)
+            processed = await run_evaluation_once(worker_id)
+            if not processed:
+                processed = await run_summary_once(worker_id)
             if not processed:
                 processed = await run_resume_once(worker_id)
             if not processed:

@@ -48,10 +48,20 @@ vi.mock("../features/knowledge/api", () => ({
   },
 }));
 
+vi.mock("../features/reports/api", () => ({
+  reportApi: {
+    list: vi.fn().mockResolvedValue([]),
+    get: vi.fn(),
+    retry: vi.fn(),
+    coach: vi.fn(),
+    jobEventsUrl: vi.fn(),
+  },
+}));
+
 const routes = [
   ["/interviews", "选择公司"],
   ["/questions", "面试知识库"],
-  ["/reports", "评估报告"],
+  ["/reports", "面试评估报告"],
   ["/settings", "系统设置"],
   ["/settings/memory", "长期记忆"],
 ] as const;

@@ -1,7 +1,4 @@
 import {
-  FileBarChart,
-} from "lucide-react";
-import {
   Navigate,
   Outlet,
   createBrowserRouter,
@@ -15,7 +12,7 @@ import { CompanySelectionPage } from "../features/interviews/companies/CompanySe
 import { InterviewSetupPage } from "../features/interviews/planning/InterviewSetupPage";
 import { LiveInterviewPage } from "../features/interviews/live/LiveInterviewPage";
 import { KnowledgeBasePage } from "../features/knowledge/KnowledgeBasePage";
-import { EmptyStatePage } from "../pages/EmptyStatePage";
+import { InterviewReportPage } from "../pages/InterviewReportPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { AppShell } from "./shell/AppShell";
 
@@ -47,14 +44,11 @@ export const appRoutes: RouteObject[] = [
       },
       {
         path: "reports",
-        element: (
-          <EmptyStatePage
-            eyebrow="EVIDENCE REPORTS"
-            title="评估报告"
-            description="完成首场模拟后，这里会展示逐题证据与能力趋势。"
-            icon={FileBarChart}
-          />
-        ),
+        element: <InterviewReportPage />,
+      },
+      {
+        path: "reports/:reportId",
+        element: <InterviewReportPage />,
       },
       {
         path: "settings",
