@@ -1,10 +1,10 @@
 export type MemoryType =
+  | "project_fact"
   | "stable_skill"
   | "recurring_gap"
-  | "preference"
-  | "target"
-  | "constraint"
-  | "company_context";
+  | "communication_preference"
+  | "interview_preference"
+  | "practice_goal";
 
 export type MemoryStatus = "proposed" | "active" | "conflicted" | "rejected" | "expired";
 

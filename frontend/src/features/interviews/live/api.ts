@@ -13,6 +13,41 @@ export interface InterviewSession {
   messages: RealtimeMessage[];
 }
 
+export interface ContextSnapshotDiagnostic {
+  id: string;
+  created_at: string;
+  agent_role: string;
+  prompt_schema_version: string;
+  included_refs: Record<string, string[]>;
+  excluded_refs: Array<{ type: string; id: string; reason: string }>;
+  token_by_layer: Record<string, number>;
+  count_method: string;
+  compaction_level: number;
+  input_tokens: number;
+  output_tokens: number;
+}
+
+export interface ContextDiagnostics {
+  session_id: string;
+  current_state: Record<string, unknown>;
+  summary: {
+    snapshot_count: number;
+    max_compaction_level: number;
+    total_input_tokens: number;
+    average_compression_ratio: number;
+    retrieval_candidate_count: number;
+    retrieval_included_count: number;
+  };
+  snapshots: ContextSnapshotDiagnostic[];
+  segments: Array<{
+    id: string;
+    sequence: number;
+    status: string;
+    token_count: number;
+    valid_summary_ids: string[];
+  }>;
+}
+
 export const liveInterviewApi = {
   create: ({ planId, excludedMemoryIds = [] }: { planId: string; excludedMemoryIds?: string[] }) => apiRequest<InterviewSession>("/interview-sessions", {
     method: "POST",
@@ -22,4 +57,6 @@ export const liveInterviewApi = {
     method: "POST",
   }),
   get: (sessionId: string) => apiRequest<InterviewSession>(`/interview-sessions/${sessionId}`),
+  diagnostics: (sessionId: string) =>
+    apiRequest<ContextDiagnostics>(`/interview-sessions/${sessionId}/context/diagnostics`),
 };

@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { InterviewSocket, type RealtimeMessage, type ServerEvent } from "../../../lib/realtime/interviewSocket";
+import { ContextUsage } from "../../diagnostics/ContextUsage";
 import { liveInterviewApi } from "./api";
 
 export function LiveInterviewPage() {
@@ -90,6 +91,7 @@ export function LiveInterviewPage() {
       <aside className="live-side">
         <section><ShieldCheck size={18} /><h2>本场规则</h2><p>一次只处理一个问题；回答确认后写入记录；断线会自动补发已确认事件。</p></section>
         <section><h2>会话状态</h2><strong>{status}</strong></section>
+        <ContextUsage sessionId={sessionId} />
         <button className="secondary-button" type="button" onClick={() => socketRef.current?.send("session.pause")}><Pause size={15} /> 暂停</button>
         <button className="text-button danger" type="button" onClick={() => socketRef.current?.send("session.finish")}><Square size={14} /> 提前结束</button>
       </aside>

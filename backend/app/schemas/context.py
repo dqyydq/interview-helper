@@ -34,6 +34,7 @@ class SegmentDiagnostic(ApiModel):
 class ContextDiagnosticsPublic(ApiModel):
     session_id: uuid.UUID
     current_state: dict
+    summary: dict
     snapshots: list[ContextSnapshotPublic]
     segments: list[SegmentDiagnostic]
 

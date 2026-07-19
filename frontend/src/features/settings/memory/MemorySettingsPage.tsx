@@ -24,12 +24,12 @@ const statusFilters: Array<{ value: MemoryStatus | "all"; label: string }> = [
 ];
 
 const typeLabels: Record<MemoryType, string> = {
+  project_fact: "项目事实",
   stable_skill: "稳定能力",
   recurring_gap: "反复短板",
-  preference: "面试偏好",
-  target: "求职目标",
-  constraint: "明确约束",
-  company_context: "公司上下文",
+  communication_preference: "沟通偏好",
+  interview_preference: "面试偏好",
+  practice_goal: "练习目标",
 };
 
 const statusLabels: Record<MemoryStatus, string> = {

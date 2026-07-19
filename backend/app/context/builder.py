@@ -330,6 +330,10 @@ async def build_interviewer_context(
     selected_message_ids = {item.id for item in selected_messages}
     selected_summary_ids = {summary.id for summary, _ in selected_summaries}
     selected_memory_ids = {hit.memory.id for hit, _ in selected_memories}
+    selected_input_tokens = (
+        system_tokens + state_tokens + recent_tokens + summary_tokens + memory_tokens
+    )
+    compression_ratio = round(selected_input_tokens / max(candidate_tokens, 1), 4)
     included_refs.update(
         {
             "messages": [str(item.id) for item in selected_messages],
@@ -381,12 +385,18 @@ async def build_interviewer_context(
             ContextLayer.OPTIONAL.value: 0,
             "effective_input_budget": budget.effective_input_tokens,
             "safety_margin": budget.safety_margin_tokens,
+            "candidate_input_tokens": candidate_tokens,
+            "selected_input_tokens": selected_input_tokens,
+            "compression_ratio": compression_ratio,
+            "tokens_removed": max(0, candidate_tokens - selected_input_tokens),
+            "retrieval_candidate_count": len(retrieved_memory_hits),
+            "retrieval_included_count": len(selected_memories),
+            "summary_candidate_count": len(summary_entries),
+            "summary_included_count": len(selected_summaries),
         },
         count_method=counter.method,
         compaction_level=compaction_level,
-        input_tokens=(
-            system_tokens + state_tokens + recent_tokens + summary_tokens + memory_tokens
-        ),
+        input_tokens=selected_input_tokens,
     )
     session.add(snapshot)
     await session.flush()
@@ -452,7 +462,8 @@ async def build_summary_context(
     )
     system_tokens = counter.count_text(system_text).tokens
     recent_tokens = counter.count_messages([data_message]).tokens
-    budget.ensure_essential_fits(system_tokens + recent_tokens)
+    candidate_tokens = system_tokens + recent_tokens
+    budget.ensure_essential_fits(candidate_tokens)
     request = ChatRequest(
         system=system_text,
         messages=[data_message],
@@ -480,10 +491,18 @@ async def build_summary_context(
             ContextLayer.OPTIONAL.value: 0,
             "effective_input_budget": budget.effective_input_tokens,
             "safety_margin": budget.safety_margin_tokens,
+            "candidate_input_tokens": candidate_tokens,
+            "selected_input_tokens": candidate_tokens,
+            "compression_ratio": 1.0,
+            "tokens_removed": 0,
+            "retrieval_candidate_count": 0,
+            "retrieval_included_count": 0,
+            "summary_candidate_count": 0,
+            "summary_included_count": 0,
         },
         count_method=counter.method,
-        compaction_level=budget.compaction_level(system_tokens + recent_tokens),
-        input_tokens=system_tokens + recent_tokens,
+        compaction_level=budget.compaction_level(candidate_tokens),
+        input_tokens=candidate_tokens,
     )
     session.add(snapshot)
     await session.commit()

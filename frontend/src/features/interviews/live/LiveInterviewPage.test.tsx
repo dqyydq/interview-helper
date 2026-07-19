@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { liveInterviewApi } from "./api";
 import { LiveInterviewPage } from "./LiveInterviewPage";
 
-vi.mock("./api", () => ({ liveInterviewApi: { start: vi.fn() } }));
+vi.mock("./api", () => ({ liveInterviewApi: { start: vi.fn(), diagnostics: vi.fn() } }));
 
 class WebSocketStub {
   static OPEN = 1;
@@ -53,6 +53,38 @@ describe("LiveInterviewPage", () => {
         sequence: 1,
       }],
     });
+    vi.mocked(liveInterviewApi.diagnostics).mockResolvedValue({
+      session_id: "session-1",
+      current_state: {},
+      summary: {
+        snapshot_count: 1,
+        max_compaction_level: 2,
+        total_input_tokens: 2_100,
+        average_compression_ratio: 0.7,
+        retrieval_candidate_count: 3,
+        retrieval_included_count: 2,
+      },
+      snapshots: [{
+        id: "snapshot-1",
+        created_at: new Date().toISOString(),
+        agent_role: "interviewer",
+        prompt_schema_version: "interviewer.v2",
+        included_refs: {},
+        excluded_refs: [],
+        token_by_layer: {
+          effective_input_budget: 3_000,
+          selected_input_tokens: 2_100,
+          compression_ratio: 0.7,
+          retrieval_candidate_count: 3,
+          retrieval_included_count: 2,
+        },
+        count_method: "conservative_estimate:estimated",
+        compaction_level: 2,
+        input_tokens: 2_100,
+        output_tokens: 120,
+      }],
+      segments: [],
+    });
   });
 
   it("shows the confirmed transcript without scores", async () => {
@@ -68,5 +100,7 @@ describe("LiveInterviewPage", () => {
     expect(await screen.findByText("请设计一个多模型网关。")).toBeInTheDocument();
     expect(screen.getByText("面试中不显示评分")).toBeInTheDocument();
     expect(screen.getByLabelText("你的回答")).toBeEnabled();
+    expect(await screen.findByText("2,100 / 3,000")).toBeInTheDocument();
+    expect(screen.getByText("70%")).toBeInTheDocument();
   });
 });
