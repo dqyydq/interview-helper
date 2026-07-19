@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import AppError
 from app.context.builder import build_interviewer_context
+from app.context.segmentation import close_current_segment, get_open_segment
 from app.db.models.common import MessageRole, ModelRole, SessionStatus
 from app.db.models.context import InterviewContextState
 from app.db.models.interview import InterviewMessage, InterviewSession, PlanQuestion
@@ -54,9 +55,15 @@ async def save_user_answer(
     context = await session.scalar(
         select(InterviewContextState).where(InterviewContextState.session_id == interview.id)
     )
+    segment = (
+        await get_open_segment(session, interview.id, context.current_plan_question_id)
+        if context and context.current_plan_question_id
+        else None
+    )
     message = InterviewMessage(
         session_id=interview.id,
         plan_question_id=context.current_plan_question_id if context else None,
+        segment_id=segment.id if segment else None,
         role=MessageRole.USER,
         sequence=await _next_message_sequence(session, interview.id),
         content=text,
@@ -90,6 +97,12 @@ async def prepare_turn(session: AsyncSession, interview: InterviewSession) -> Tu
             )
         )
         if next_question:
+            await close_current_segment(
+                session,
+                interview,
+                current.id,
+                next_question_id=next_question.id,
+            )
             context.completed_question_ids = [*context.completed_question_ids, str(current.id)]
             context.current_plan_question_id = next_question.id
             context.current_follow_up_index = 0
@@ -98,6 +111,7 @@ async def prepare_turn(session: AsyncSession, interview: InterviewSession) -> Tu
             interview.touch()
             await session.commit()
             return TurnPlan(next_question, next_question.prompt_snapshot, None, None)
+        await close_current_segment(session, interview, current.id)
         return TurnPlan(current, "本场问题已经完成。你可以补充最后一点，或结束面试。", None, None)
     connection = await resolve_role_connection(session, interview.profile_id, ModelRole.INTERVIEWER)
     built = await build_interviewer_context(
@@ -119,9 +133,11 @@ async def prepare_turn(session: AsyncSession, interview: InterviewSession) -> Tu
 async def save_assistant_message(
     session: AsyncSession, interview: InterviewSession, turn: TurnPlan, content: str
 ) -> InterviewMessage:
+    segment = await get_open_segment(session, interview.id, turn.plan_question.id)
     message = InterviewMessage(
         session_id=interview.id,
         plan_question_id=turn.plan_question.id,
+        segment_id=segment.id if segment else None,
         role=MessageRole.ASSISTANT,
         sequence=await _next_message_sequence(session, interview.id),
         content=content.strip(),

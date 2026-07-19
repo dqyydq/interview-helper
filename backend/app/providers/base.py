@@ -108,6 +108,12 @@ class StructuredOutputRunner:
         self.max_repairs = max_repairs
 
     async def run(self, request: ChatRequest, output_type: type[OutputT]) -> OutputT:
+        output, _ = await self.run_with_response(request, output_type)
+        return output
+
+    async def run_with_response(
+        self, request: ChatRequest, output_type: type[OutputT]
+    ) -> tuple[OutputT, ChatResponse]:
         adapter = TypeAdapter(output_type)
         working_request = request.model_copy(deep=True)
         working_request.response_schema = adapter.json_schema()
@@ -116,7 +122,7 @@ class StructuredOutputRunner:
             response = await self.provider.chat(working_request)
             try:
                 payload = json.loads(response.content)
-                return adapter.validate_python(payload)
+                return adapter.validate_python(payload), response
             except (json.JSONDecodeError, ValidationError):
                 if attempt >= self.max_repairs:
                     break

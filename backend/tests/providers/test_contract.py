@@ -18,6 +18,7 @@ from app.providers.types import (
     ProviderHealthStatus,
     StreamEvent,
     StreamEventType,
+    Usage,
 )
 
 
@@ -67,6 +68,29 @@ async def test_structured_output_is_repaired_once_and_validated() -> None:
     assert len(provider.requests) == 2
     assert provider.requests[0].response_schema is not None
     assert "只返回修复后的 JSON" in provider.requests[1].messages[-1].content
+
+
+@pytest.mark.asyncio
+async def test_structured_output_can_return_provider_usage() -> None:
+    provider = FakeProvider(['{"verdict":"solid","score":4}'])
+
+    async def chat_with_usage(request: ChatRequest) -> ChatResponse:
+        provider.requests.append(request)
+        return ChatResponse(
+            content=provider.responses.pop(0),
+            usage=Usage(input_tokens=24, output_tokens=8),
+            provider_request_id="request-1",
+        )
+
+    provider.chat = chat_with_usage  # type: ignore[method-assign]
+    result, response = await StructuredOutputRunner(provider).run_with_response(
+        ChatRequest(messages=[ChatMessage(role=MessageRole.USER, content="evaluate")]),
+        Result,
+    )
+
+    assert result.verdict == "solid"
+    assert response.usage.total_tokens == 32
+    assert response.provider_request_id == "request-1"
 
 
 @pytest.mark.asyncio

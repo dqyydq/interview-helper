@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.context_summarizer import SYSTEM_PROMPT as SUMMARIZER_SYSTEM_PROMPT
 from app.agents.interviewer import SYSTEM_PROMPT
 from app.context.token_budget import ContextLayer, TokenBudget
 from app.context.token_counter import UnifiedTokenCounter
@@ -156,9 +157,49 @@ async def build_interviewer_context(
     )
     current_messages = [item for item in all_messages if item.plan_question_id == current.id]
     previous_messages = [item for item in all_messages if item.plan_question_id != current.id]
-    previous_ending = previous_messages[-2:]
-    previous_optional = previous_messages[-10:-2]
     summaries = await _load_summaries(session, interview.id, current.id)
+    summarized_segment_ids = set(
+        (
+            await session.scalars(
+                select(ContextSummary.segment_id)
+                .join(ConversationSegment, ConversationSegment.id == ContextSummary.segment_id)
+                .where(
+                    ConversationSegment.session_id == interview.id,
+                    ConversationSegment.plan_question_id != current.id,
+                    ContextSummary.validation_status == SummaryValidationStatus.VALID,
+                    ContextSummary.deleted_at.is_(None),
+                )
+            )
+        ).all()
+    )
+    completed_segments = list(
+        (
+            await session.scalars(
+                select(ConversationSegment).where(
+                    ConversationSegment.session_id == interview.id,
+                    ConversationSegment.plan_question_id != current.id,
+                    ConversationSegment.deleted_at.is_(None),
+                )
+            )
+        ).all()
+    )
+    uncompressed_segment_ids = {
+        item.id for item in completed_segments if item.id not in summarized_segment_ids
+    }
+    protected_previous = [
+        item for item in previous_messages if item.segment_id in uncompressed_segment_ids
+    ]
+    previous_ending = previous_messages[-2:]
+    essential_previous_by_id = {
+        item.id: item for item in [*protected_previous, *previous_ending]
+    }
+    essential_previous = sorted(
+        essential_previous_by_id.values(), key=lambda item: item.sequence
+    )
+    essential_previous_ids = set(essential_previous_by_id)
+    previous_optional = [
+        item for item in previous_messages[-10:] if item.id not in essential_previous_ids
+    ]
 
     system_tokens = counter.count_text(system_text).tokens
     state_tokens = counter.count_text(state_text).tokens
@@ -166,7 +207,8 @@ async def build_interviewer_context(
         ChatMessage(role=MessageRole(item.role), content=item.content) for item in current_messages
     ]
     ending_chat = [
-        ChatMessage(role=MessageRole(item.role), content=item.content) for item in previous_ending
+        ChatMessage(role=MessageRole(item.role), content=item.content)
+        for item in essential_previous
     ]
     essential_recent_tokens = counter.count_messages([*ending_chat, *current_chat]).tokens
     essential_tokens = system_tokens + state_tokens + essential_recent_tokens
@@ -221,7 +263,7 @@ async def build_interviewer_context(
     budget.ensure_essential_fits(system_tokens + state_tokens + recent_tokens + summary_tokens)
 
     selected_messages = sorted(
-        [*selected_optional, *previous_ending, *current_messages], key=lambda item: item.sequence
+        [*selected_optional, *essential_previous, *current_messages], key=lambda item: item.sequence
     )
     summary_block = ""
     if selected_summaries:
@@ -276,6 +318,90 @@ async def build_interviewer_context(
         count_method=counter.method,
         compaction_level=compaction_level,
         input_tokens=system_tokens + state_tokens + recent_tokens + summary_tokens,
+    )
+    session.add(snapshot)
+    await session.commit()
+    await session.refresh(snapshot)
+    return BuiltContext(request=request, snapshot_id=snapshot.id)
+
+
+async def build_summary_context(
+    session: AsyncSession,
+    *,
+    interview: InterviewSession,
+    segment: ConversationSegment,
+    question: PlanQuestion,
+    messages: list[InterviewMessage],
+    attachments: list[dict],
+    connection: ModelConnection,
+) -> BuiltContext:
+    """Build a bounded, auditable prompt containing one closed segment only."""
+
+    max_output_tokens = min(connection.max_output_tokens, 2_048)
+    counter = UnifiedTokenCounter(connection.tokenizer_type)
+    budget = TokenBudget.create(
+        context_window_tokens=connection.context_window_tokens,
+        reserved_output_tokens=max_output_tokens,
+    )
+    system_text = f"{SUMMARIZER_SYSTEM_PROMPT}\n\n{DATA_BOUNDARY_PROMPT}"
+    payload = {
+        "segment": {
+            "id": str(segment.id),
+            "question_id": str(question.id),
+            "capability_tags": question.capability_tags,
+            "asked_question": question.prompt_snapshot,
+            "start_sequence": segment.start_message_sequence,
+            "end_sequence": segment.end_message_sequence,
+        },
+        "messages": [
+            {
+                "id": str(item.id),
+                "sequence": item.sequence,
+                "role": str(item.role),
+                "content": item.content,
+            }
+            for item in messages
+        ],
+        "attachments": attachments,
+    }
+    data_message = ChatMessage(
+        role=MessageRole.USER,
+        content="请压缩以下已关闭题链：\n" + _json(payload),
+    )
+    system_tokens = counter.count_text(system_text).tokens
+    recent_tokens = counter.count_messages([data_message]).tokens
+    budget.ensure_essential_fits(system_tokens + recent_tokens)
+    request = ChatRequest(
+        system=system_text,
+        messages=[data_message],
+        max_tokens=max_output_tokens,
+        temperature=0.1,
+    )
+    snapshot = ContextSnapshot(
+        session_id=interview.id,
+        agent_role=ModelRole.CONTEXT_SUMMARIZER,
+        model_connection_id=connection.id,
+        prompt_schema_version="context-summary.v1",
+        included_refs={
+            "segments": [str(segment.id)],
+            "plan_question": [str(question.id)],
+            "messages": [str(item.id) for item in messages],
+            "attachments": [str(item["id"]) for item in attachments],
+        },
+        excluded_refs=[],
+        token_by_layer={
+            ContextLayer.SYSTEM.value: system_tokens,
+            ContextLayer.STATE.value: 0,
+            ContextLayer.RECENT.value: recent_tokens,
+            ContextLayer.SUMMARIES.value: 0,
+            ContextLayer.RETRIEVAL.value: 0,
+            ContextLayer.OPTIONAL.value: 0,
+            "effective_input_budget": budget.effective_input_tokens,
+            "safety_margin": budget.safety_margin_tokens,
+        },
+        count_method=counter.method,
+        compaction_level=budget.compaction_level(system_tokens + recent_tokens),
+        input_tokens=system_tokens + recent_tokens,
     )
     session.add(snapshot)
     await session.commit()

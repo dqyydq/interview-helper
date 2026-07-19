@@ -1,8 +1,9 @@
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
+from app.db.models.common import JobStatus, JobType, SegmentStatus
 from app.db.models.company import Company
 from app.db.models.context import ConversationSegment, InterviewContextState
 from app.db.models.interview import (
@@ -18,6 +19,7 @@ from app.db.models.question import Question, QuestionBank, QuestionTagLink
 from app.db.session import async_session_factory, engine
 from app.main import app
 from app.realtime.event_store import append_event, find_client_event, replay_events
+from app.workers.context_summary_jobs import run_once as run_summary_once
 from app.workers.plan_jobs import run_once as run_plan_once
 
 
@@ -147,9 +149,27 @@ async def test_plan_job_builds_traceable_ready_plan() -> None:
     assert finished.json()["status"] == "completed"
     assert finished_again.json()["ended_at"] == finished.json()["ended_at"]
 
+    assert await run_summary_once("test-summary-worker") is True
+
     async with async_session_factory() as database:
         interview = await database.get(InterviewSession, session_id)
         assert interview is not None
+        segment = await database.scalar(
+            select(ConversationSegment).where(ConversationSegment.session_id == interview.id)
+        )
+        summary_job = await database.scalar(
+            select(BackgroundJob).where(
+                BackgroundJob.job_type == JobType.CONTEXT_SUMMARY,
+                BackgroundJob.payload["session_id"].astext == str(interview.id),
+            )
+        )
+        assert segment is not None
+        assert segment.status == SegmentStatus.SUMMARY_FAILED
+        assert segment.end_message_sequence == 1
+        assert segment.token_count > 0
+        assert summary_job is not None
+        assert summary_job.status == JobStatus.FAILED
+        assert summary_job.error_code == "model_role_unbound"
         first_event = await append_event(
             database,
             interview,

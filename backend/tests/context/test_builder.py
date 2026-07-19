@@ -1,9 +1,26 @@
+import json
+from collections.abc import AsyncIterator
+
+import pytest
 from sqlalchemy import delete
 
 from app.context.builder import build_interviewer_context
-from app.db.models.common import MessageRole, PlanStatus, ProviderType, SessionStatus
+from app.context.summarizer import summarize_segment
+from app.db.models.common import (
+    MessageRole,
+    PlanStatus,
+    ProviderType,
+    SegmentStatus,
+    SessionStatus,
+    SummaryValidationStatus,
+)
 from app.db.models.company import Company, CompanyStylePack, RoundProfile
-from app.db.models.context import ContextSnapshot, InterviewContextState
+from app.db.models.context import (
+    ContextSnapshot,
+    ContextSummary,
+    ConversationSegment,
+    InterviewContextState,
+)
 from app.db.models.interview import (
     InterviewConfig,
     InterviewMessage,
@@ -14,13 +31,46 @@ from app.db.models.interview import (
 from app.db.models.model_connection import ModelConnection
 from app.db.models.profile import UserProfile
 from app.db.session import async_session_factory, engine
+from app.providers.base import ChatProvider
+from app.providers.types import (
+    ChatRequest,
+    ChatResponse,
+    ProviderHealth,
+    ProviderHealthStatus,
+    StreamEvent,
+    Usage,
+)
+
+
+class SummaryProvider(ChatProvider):
+    def __init__(self, content: str) -> None:
+        self.content = content
+
+    async def chat(self, request: ChatRequest) -> ChatResponse:
+        return ChatResponse(
+            content=self.content,
+            usage=Usage(input_tokens=120, output_tokens=40),
+            provider_request_id="summary-request-1",
+        )
+
+    async def stream_chat(self, request: ChatRequest) -> AsyncIterator[StreamEvent]:
+        if False:
+            yield StreamEvent(type="completed")  # pragma: no cover
+
+    async def health_check(self) -> ProviderHealth:
+        return ProviderHealth(status=ProviderHealthStatus.HEALTHY, latency_ms=1)
+
+    async def aclose(self) -> None:
+        return None
 
 
 async def _clear_context_test_data() -> None:
     async with async_session_factory() as session:
         await session.execute(delete(ContextSnapshot))
+        await session.execute(delete(ContextSummary))
         await session.execute(delete(InterviewMessage))
         await session.execute(delete(InterviewContextState))
+        await session.execute(delete(ConversationSegment))
         await session.execute(delete(InterviewSession))
         await session.execute(delete(PlanQuestion))
         await session.execute(delete(InterviewPlan))
@@ -33,7 +83,9 @@ async def _clear_context_test_data() -> None:
         await session.commit()
 
 
-async def test_builder_keeps_current_chain_and_persists_explainable_snapshot() -> None:
+async def test_builder_keeps_current_chain_and_persists_explainable_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     await _clear_context_test_data()
     try:
         async with async_session_factory() as session:
@@ -108,9 +160,18 @@ async def test_builder_keeps_current_chain_and_persists_explainable_snapshot() -
             )
             session.add(context)
             await session.flush()
+            segment = ConversationSegment(
+                session_id=interview.id,
+                plan_question_id=question.id,
+                sequence=1,
+                start_message_sequence=1,
+            )
+            session.add(segment)
+            await session.flush()
             answer = InterviewMessage(
                 session_id=interview.id,
                 plan_question_id=question.id,
+                segment_id=segment.id,
                 role=MessageRole.USER,
                 sequence=1,
                 content="我会保留当前题链，并对已关闭分段做结构化摘要。",
@@ -136,6 +197,46 @@ async def test_builder_keeps_current_chain_and_persists_explainable_snapshot() -
             assert snapshot.count_method.startswith("conservative_estimate")
             assert snapshot.input_tokens > 0
             assert snapshot.token_by_layer["safety_margin"] > 0
+
+            segment.status = SegmentStatus.CLOSED
+            segment.end_message_sequence = 1
+            segment.touch()
+            await session.commit()
+
+            async def resolve_connection(*args, **kwargs) -> ModelConnection:
+                return connection
+
+            summary_content = json.dumps(
+                {
+                    "question_id": str(question.id),
+                    "capability_tags": question.capability_tags,
+                    "asked_question": question.prompt_snapshot,
+                    "user_core_answer": {
+                        "text": "保留当前题链并压缩已关闭分段",
+                        "evidence_message_ids": [str(answer.id)],
+                    },
+                    "explicit_claims": [],
+                    "decisions_and_tradeoffs": [],
+                    "caveats_and_failures": [],
+                    "unresolved_points": [],
+                    "attachment_refs": [],
+                    "evidence_message_ids": [str(answer.id)],
+                },
+                ensure_ascii=False,
+            )
+            monkeypatch.setattr(
+                "app.context.summarizer.resolve_role_connection", resolve_connection
+            )
+            monkeypatch.setattr(
+                "app.context.summarizer.build_provider",
+                lambda configured: SummaryProvider(summary_content),
+            )
+
+            summary = await summarize_segment(session, segment_id=segment.id)
+
+            assert summary.validation_status == SummaryValidationStatus.VALID
+            assert summary.evidence_message_ids == [str(answer.id)]
+            assert summary.token_count > 0
     finally:
         await _clear_context_test_data()
         await engine.dispose()

@@ -4,8 +4,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import AppError
-from app.db.models.common import MessageRole, PlanStatus, SessionStatus, utc_now
-from app.db.models.context import ContextSnapshot, ConversationSegment, InterviewContextState
+from app.context.segmentation import close_current_segment
+from app.db.models.common import (
+    MessageRole,
+    PlanStatus,
+    SessionStatus,
+    SummaryValidationStatus,
+    utc_now,
+)
+from app.db.models.context import (
+    ContextSnapshot,
+    ContextSummary,
+    ConversationSegment,
+    InterviewContextState,
+)
 from app.db.models.interview import (
     InterviewConfig,
     InterviewMessage,
@@ -14,7 +26,11 @@ from app.db.models.interview import (
     PlanQuestion,
 )
 from app.realtime.state_machine import ensure_transition
-from app.schemas.context import ContextDiagnosticsPublic, ContextSnapshotPublic
+from app.schemas.context import (
+    ContextDiagnosticsPublic,
+    ContextSnapshotPublic,
+    SegmentDiagnostic,
+)
 from app.schemas.interview_session import InterviewMessagePublic, InterviewSessionPublic
 from app.services.interview_planning import plan_public
 
@@ -100,6 +116,30 @@ async def context_diagnostics(
             )
         ).all()
     )
+    segments = list(
+        (
+            await session.scalars(
+                select(ConversationSegment)
+                .where(
+                    ConversationSegment.session_id == interview.id,
+                    ConversationSegment.deleted_at.is_(None),
+                )
+                .order_by(ConversationSegment.sequence)
+            )
+        ).all()
+    )
+    summary_rows = (
+        await session.execute(
+            select(ContextSummary.segment_id, ContextSummary.id).where(
+                ContextSummary.segment_id.in_([item.id for item in segments]),
+                ContextSummary.validation_status == SummaryValidationStatus.VALID,
+                ContextSummary.deleted_at.is_(None),
+            )
+        )
+    ).all()
+    summaries_by_segment: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for segment_id, summary_id in summary_rows:
+        summaries_by_segment.setdefault(segment_id, []).append(summary_id)
     current_state = (
         {
             "current_plan_question_id": str(context.current_plan_question_id)
@@ -117,6 +157,19 @@ async def context_diagnostics(
         session_id=interview.id,
         current_state=current_state,
         snapshots=[ContextSnapshotPublic.model_validate(item) for item in snapshots],
+        segments=[
+            SegmentDiagnostic(
+                id=item.id,
+                plan_question_id=item.plan_question_id,
+                sequence=item.sequence,
+                status=item.status,
+                start_message_sequence=item.start_message_sequence,
+                end_message_sequence=item.end_message_sequence,
+                token_count=item.token_count,
+                valid_summary_ids=summaries_by_segment.get(item.id, []),
+            )
+            for item in segments
+        ],
     )
 
 
@@ -241,6 +294,15 @@ async def resume_session(session: AsyncSession, interview: InterviewSession) -> 
 async def finish_session(session: AsyncSession, interview: InterviewSession) -> InterviewSession:
     if interview.status == SessionStatus.COMPLETED:
         return interview
+    context = await session.scalar(
+        select(InterviewContextState).where(InterviewContextState.session_id == interview.id)
+    )
+    if context and context.current_plan_question_id:
+        await close_current_segment(
+            session,
+            interview,
+            context.current_plan_question_id,
+        )
     current = SessionStatus(interview.status)
     if current != SessionStatus.COMPLETING:
         ensure_transition(current, SessionStatus.COMPLETING)
