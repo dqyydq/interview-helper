@@ -161,6 +161,7 @@ class MemoryType(StrEnum):
     STABLE_SKILL = "stable_skill"
     RECURRING_GAP = "recurring_gap"
     COMMUNICATION_PREFERENCE = "communication_preference"
+    INTERVIEW_PREFERENCE = "interview_preference"
     PRACTICE_GOAL = "practice_goal"
 
 

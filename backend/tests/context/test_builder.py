@@ -2,11 +2,12 @@ import json
 from collections.abc import AsyncIterator
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from app.context.builder import build_interviewer_context
 from app.context.summarizer import summarize_segment
 from app.db.models.common import (
+    MemoryType,
     MessageRole,
     PlanStatus,
     ProviderType,
@@ -28,9 +29,12 @@ from app.db.models.interview import (
     InterviewSession,
     PlanQuestion,
 )
+from app.db.models.memory import MemoryConflict, MemoryItem, MemorySource, MemoryUsage
 from app.db.models.model_connection import ModelConnection
 from app.db.models.profile import UserProfile
 from app.db.session import async_session_factory, engine
+from app.memory.types import MemoryCandidate, MemorySourceInput
+from app.memory.writer import remember
 from app.providers.base import ChatProvider
 from app.providers.types import (
     ChatRequest,
@@ -66,8 +70,12 @@ class SummaryProvider(ChatProvider):
 
 async def _clear_context_test_data() -> None:
     async with async_session_factory() as session:
+        await session.execute(delete(MemoryUsage))
         await session.execute(delete(ContextSnapshot))
         await session.execute(delete(ContextSummary))
+        await session.execute(delete(MemoryConflict))
+        await session.execute(delete(MemorySource))
+        await session.execute(delete(MemoryItem))
         await session.execute(delete(InterviewMessage))
         await session.execute(delete(InterviewContextState))
         await session.execute(delete(ConversationSegment))
@@ -178,6 +186,18 @@ async def test_builder_keeps_current_chain_and_persists_explainable_snapshot(
             )
             session.add(answer)
             await session.commit()
+            memory = await remember(
+                session,
+                profile_id=profile.id,
+                candidate=MemoryCandidate(
+                    memory_type=MemoryType.PROJECT_FACT,
+                    canonical_key="project.context.role",
+                    content="我在长对话项目中负责上下文压缩与证据追踪。",
+                    confidence=0.95,
+                    explicit_user_statement=True,
+                    source=MemorySourceInput(source_type="user_manual"),
+                ),
+            )
 
             built = await build_interviewer_context(
                 session,
@@ -197,6 +217,13 @@ async def test_builder_keeps_current_chain_and_persists_explainable_snapshot(
             assert snapshot.count_method.startswith("conservative_estimate")
             assert snapshot.input_tokens > 0
             assert snapshot.token_by_layer["safety_margin"] > 0
+            assert "上下文压缩与证据追踪" in (built.request.system or "")
+            assert str(memory.id) in snapshot.included_refs["memories"]
+            usage = await session.scalar(
+                select(MemoryUsage).where(MemoryUsage.context_snapshot_id == snapshot.id)
+            )
+            assert usage is not None
+            assert usage.memory_id == memory.id
 
             segment.status = SegmentStatus.CLOSED
             segment.end_message_sequence = 1

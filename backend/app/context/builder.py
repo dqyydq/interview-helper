@@ -9,7 +9,7 @@ from app.agents.context_summarizer import SYSTEM_PROMPT as SUMMARIZER_SYSTEM_PRO
 from app.agents.interviewer import SYSTEM_PROMPT
 from app.context.token_budget import ContextLayer, TokenBudget
 from app.context.token_counter import UnifiedTokenCounter
-from app.db.models.common import MessageRole, ModelRole, SummaryValidationStatus
+from app.db.models.common import MessageRole, ModelRole, SummaryValidationStatus, utc_now
 from app.db.models.company import CompanyStylePack, RoundProfile
 from app.db.models.context import (
     ContextSnapshot,
@@ -24,7 +24,9 @@ from app.db.models.interview import (
     InterviewSession,
     PlanQuestion,
 )
+from app.db.models.memory import MemoryUsage
 from app.db.models.model_connection import ModelConnection
+from app.memory.retriever import MemoryHit, retrieve_memories
 from app.providers.types import ChatMessage, ChatRequest
 
 PROMPT_SCHEMA_VERSION = "interviewer.v2"
@@ -47,6 +49,10 @@ def _json(value: object) -> str:
 
 def _summary_text(summary: ContextSummary) -> str:
     return f"分段摘要 {summary.id}: {_json(summary.content)}"
+
+
+def _memory_text(hit: MemoryHit) -> str:
+    return f"用户长期记忆 {hit.memory.memory_type}: {hit.memory.content}"
 
 
 async def _load_style_state(
@@ -142,6 +148,17 @@ async def build_interviewer_context(
     )
     system_text = f"{SYSTEM_PROMPT}\n\n{DATA_BOUNDARY_PROMPT}"
     state_text, included_refs = await _load_style_state(session, interview, current, context)
+    plan = await session.get(InterviewPlan, interview.plan_id)
+    config = await session.get(InterviewConfig, plan.config_id) if plan else None
+    memory_hits = await retrieve_memories(
+        session,
+        profile_id=interview.profile_id,
+        agent_role=ModelRole.INTERVIEWER,
+        query=" ".join([current.prompt_snapshot, *(str(item) for item in current.capability_tags)]),
+        company_id=config.company_id if config else None,
+        role_name=config.role_name if config else None,
+        limit=8,
+    )
 
     all_messages = list(
         (
@@ -221,20 +238,28 @@ async def build_interviewer_context(
     optional_recent_tokens = counter.count_messages(optional_chat).tokens
     summary_entries = [(summary, _summary_text(summary)) for summary in summaries]
     all_summary_tokens = sum(counter.count_text(text).tokens for _, text in summary_entries)
-    candidate_tokens = essential_tokens + optional_recent_tokens + all_summary_tokens
+    memory_entries = [(hit, _memory_text(hit)) for hit in memory_hits]
+    all_memory_tokens = sum(counter.count_text(text).tokens for _, text in memory_entries)
+    candidate_tokens = (
+        essential_tokens + optional_recent_tokens + all_summary_tokens + all_memory_tokens
+    )
     compaction_level = budget.compaction_level(candidate_tokens)
 
     optional_limit = len(previous_optional)
     summary_limit = len(summary_entries)
+    memory_limit = len(memory_entries)
     if compaction_level >= 2:
         optional_limit = 0
     if compaction_level >= 3:
         summary_limit = min(summary_limit, 3)
+        memory_limit = min(memory_limit, 2)
     if compaction_level >= 4:
         summary_limit = min(summary_limit, 1)
+        memory_limit = 0
 
     selected_optional = previous_optional[-optional_limit:] if optional_limit else []
     selected_summaries = summary_entries[:summary_limit]
+    selected_memories = memory_entries[:memory_limit]
     selected_optional_chat = [
         ChatMessage(role=MessageRole(item.role), content=item.content)
         for item in selected_optional
@@ -243,14 +268,23 @@ async def build_interviewer_context(
         [*selected_optional_chat, *ending_chat, *current_chat]
     ).tokens
     summary_tokens = sum(counter.count_text(text).tokens for _, text in selected_summaries)
+    memory_tokens = sum(counter.count_text(text).tokens for _, text in selected_memories)
 
-    while selected_summaries and system_tokens + state_tokens + recent_tokens + summary_tokens > (
-        budget.effective_input_tokens
+    while selected_memories and (
+        system_tokens + state_tokens + recent_tokens + summary_tokens + memory_tokens
+        > budget.effective_input_tokens
+    ):
+        _, removed_text = selected_memories.pop()
+        memory_tokens -= counter.count_text(removed_text).tokens
+    while selected_summaries and (
+        system_tokens + state_tokens + recent_tokens + summary_tokens + memory_tokens
+        > budget.effective_input_tokens
     ):
         _, removed_text = selected_summaries.pop()
         summary_tokens -= counter.count_text(removed_text).tokens
-    while selected_optional and system_tokens + state_tokens + recent_tokens + summary_tokens > (
-        budget.effective_input_tokens
+    while selected_optional and (
+        system_tokens + state_tokens + recent_tokens + summary_tokens + memory_tokens
+        > budget.effective_input_tokens
     ):
         selected_optional.pop(0)
         selected_optional_chat = [
@@ -260,7 +294,9 @@ async def build_interviewer_context(
         recent_tokens = counter.count_messages(
             [*selected_optional_chat, *ending_chat, *current_chat]
         ).tokens
-    budget.ensure_essential_fits(system_tokens + state_tokens + recent_tokens + summary_tokens)
+    budget.ensure_essential_fits(
+        system_tokens + state_tokens + recent_tokens + summary_tokens + memory_tokens
+    )
 
     selected_messages = sorted(
         [*selected_optional, *essential_previous, *current_messages], key=lambda item: item.sequence
@@ -270,8 +306,13 @@ async def build_interviewer_context(
         summary_block = "\n\n已验证的历史分段摘要：\n" + "\n".join(
             text for _, text in selected_summaries
         )
+    memory_block = ""
+    if selected_memories:
+        memory_block = "\n\n与本题相关、已确认的用户长期记忆：\n" + "\n".join(
+            text for _, text in selected_memories
+        )
     request = ChatRequest(
-        system=f"{system_text}\n\n{state_text}{summary_block}",
+        system=f"{system_text}\n\n{state_text}{summary_block}{memory_block}",
         messages=[
             ChatMessage(role=MessageRole(item.role), content=item.content)
             for item in selected_messages
@@ -282,10 +323,12 @@ async def build_interviewer_context(
 
     selected_message_ids = {item.id for item in selected_messages}
     selected_summary_ids = {summary.id for summary, _ in selected_summaries}
+    selected_memory_ids = {hit.memory.id for hit, _ in selected_memories}
     included_refs.update(
         {
             "messages": [str(item.id) for item in selected_messages],
             "summaries": [str(item.id) for item, _ in selected_summaries],
+            "memories": [str(hit.memory.id) for hit, _ in selected_memories],
         }
     )
     excluded_refs = [
@@ -297,6 +340,15 @@ async def build_interviewer_context(
         {"type": "summary", "id": str(item.id), "reason": "token_budget"}
         for item in summaries
         if item.id not in selected_summary_ids
+    )
+    excluded_refs.extend(
+        {
+            "type": "memory",
+            "id": str(hit.memory.id),
+            "reason": "token_budget",
+        }
+        for hit in memory_hits
+        if hit.memory.id not in selected_memory_ids
     )
     snapshot = ContextSnapshot(
         session_id=interview.id,
@@ -310,16 +362,31 @@ async def build_interviewer_context(
             ContextLayer.STATE.value: state_tokens,
             ContextLayer.RECENT.value: recent_tokens,
             ContextLayer.SUMMARIES.value: summary_tokens,
-            ContextLayer.RETRIEVAL.value: 0,
+            ContextLayer.RETRIEVAL.value: memory_tokens,
             ContextLayer.OPTIONAL.value: 0,
             "effective_input_budget": budget.effective_input_tokens,
             "safety_margin": budget.safety_margin_tokens,
         },
         count_method=counter.method,
         compaction_level=compaction_level,
-        input_tokens=system_tokens + state_tokens + recent_tokens + summary_tokens,
+        input_tokens=(
+            system_tokens + state_tokens + recent_tokens + summary_tokens + memory_tokens
+        ),
     )
     session.add(snapshot)
+    await session.flush()
+    for hit, _ in selected_memories:
+        hit.memory.last_used_at = utc_now()
+        hit.memory.touch()
+        session.add(
+            MemoryUsage(
+                memory_id=hit.memory.id,
+                session_id=interview.id,
+                context_snapshot_id=snapshot.id,
+                agent_role=ModelRole.INTERVIEWER,
+                reason=hit.reason,
+            )
+        )
     await session.commit()
     await session.refresh(snapshot)
     return BuiltContext(request=request, snapshot_id=snapshot.id)
