@@ -1,14 +1,16 @@
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.context.builder import build_interviewer_context
 from app.context.summarizer import summarize_segment
 from app.db.models.common import (
+    JobType,
     MemoryStatus,
     MemoryType,
     MessageRole,
@@ -17,6 +19,7 @@ from app.db.models.common import (
     SegmentStatus,
     SessionStatus,
     SummaryValidationStatus,
+    utc_now,
 )
 from app.db.models.company import Company, CompanyStylePack, RoundProfile
 from app.db.models.context import (
@@ -49,6 +52,12 @@ from app.providers.types import (
     StreamEvent,
     Usage,
 )
+from app.services.interview_orchestrator import (
+    prepare_turn,
+    save_restatement,
+    save_user_answer,
+)
+from app.services.interview_sessions import finish_session
 from app.services.memories import delete_memory
 
 
@@ -448,3 +457,71 @@ async def test_summary_failure_preserves_raw_transcript_for_future_evidence(
         assert snapshot
         assert str(raw_answer.id) in snapshot.included_refs["messages"]
         assert raw_answer.content in [item.content for item in built.request.messages]
+
+
+async def test_time_budget_ends_naturally_and_current_question_can_be_restated() -> None:
+    seeded = await _seed_session(question_count=1, context_window_tokens=8_000)
+    async with async_session_factory() as session:
+        interview = await session.get(InterviewSession, seeded.interview.id)
+        assert interview
+        restated = await save_restatement(session, interview)
+        assert restated.content == seeded.questions[0].prompt_snapshot
+        assert restated.message_metadata["kind"] == "restatement"
+
+        interview.started_at = utc_now() - timedelta(minutes=61)
+        interview.touch()
+        await session.commit()
+        turn = await prepare_turn(session, interview)
+
+    assert turn.should_finish is True
+    assert turn.provider is None
+    assert "时间已经结束" in (turn.static_prompt or "")
+
+
+async def test_finish_is_idempotent_and_enqueues_one_evaluation_job() -> None:
+    seeded = await _seed_session(question_count=1)
+    async with async_session_factory() as session:
+        interview = await session.get(InterviewSession, seeded.interview.id)
+        assert interview
+        first = await finish_session(session, interview)
+        second = await finish_session(session, interview)
+        evaluation_jobs = await session.scalar(
+            select(func.count(BackgroundJob.id)).where(
+                BackgroundJob.job_type == JobType.INTERVIEW_EVALUATION,
+                BackgroundJob.idempotency_key
+                == f"interview-evaluation:{interview.id}:v1",
+            )
+        )
+
+    assert first.status == SessionStatus.COMPLETED
+    assert second.status == SessionStatus.COMPLETED
+    assert evaluation_jobs == 1
+
+
+async def test_replayed_answer_event_is_persisted_only_once() -> None:
+    seeded = await _seed_session(question_count=1)
+    async with async_session_factory() as session:
+        interview = await session.get(InterviewSession, seeded.interview.id)
+        assert interview
+        first = await save_user_answer(
+            session,
+            interview,
+            "同一个客户端事件的原始回答",
+            client_event_id="answer-event-1",
+        )
+        replayed = await save_user_answer(
+            session,
+            interview,
+            "这段重放内容不应覆盖原始回答",
+            client_event_id="answer-event-1",
+        )
+        answer_count = await session.scalar(
+            select(func.count(InterviewMessage.id)).where(
+                InterviewMessage.session_id == interview.id,
+                InterviewMessage.role == MessageRole.USER,
+            )
+        )
+
+    assert replayed.id == first.id
+    assert replayed.content == "同一个客户端事件的原始回答"
+    assert answer_count == 1

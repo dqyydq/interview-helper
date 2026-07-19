@@ -27,6 +27,17 @@ async def append_event(
     client_event_id: str | None = None,
 ) -> ServerEvent:
     await session.refresh(interview, with_for_update=True)
+    if client_event_id:
+        existing = await session.scalar(
+            select(InterviewRealtimeEvent).where(
+                InterviewRealtimeEvent.session_id == interview.id,
+                InterviewRealtimeEvent.client_event_id == client_event_id,
+                InterviewRealtimeEvent.deleted_at.is_(None),
+            )
+        )
+        if existing:
+            await session.commit()
+            return to_server_event(existing)
     interview.last_event_sequence += 1
     interview.touch()
     row = InterviewRealtimeEvent(

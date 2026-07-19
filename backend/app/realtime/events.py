@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field
 
 ClientEventType = Literal[
     "session.resume",
+    "session.restate",
+    "user.transcript.partial",
+    "user.answer.commit",
     "user.text.submit",
     "session.pause",
     "session.finish",

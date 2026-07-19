@@ -17,11 +17,28 @@ export interface ServerEvent {
   payload: Record<string, unknown>;
 }
 
+type ClientEventType =
+  | "session.resume"
+  | "session.restate"
+  | "user.transcript.partial"
+  | "user.answer.commit"
+  | "user.text.submit"
+  | "session.pause"
+  | "session.finish";
+
+interface ClientEvent {
+  event_id: string;
+  type: ClientEventType;
+  sequence: number;
+  payload: Record<string, unknown>;
+}
+
 export class InterviewSocket {
   private socket: WebSocket | null = null;
   private reconnectTimer: number | null = null;
   private closed = false;
   private clientSequence = 0;
+  private pendingAnswer: ClientEvent | null = null;
   lastSequence = 0;
 
   constructor(
@@ -42,10 +59,19 @@ export class InterviewSocket {
     url.pathname = `${url.pathname}/interviews/${this.sessionId}/live`;
     url.search = `last_sequence=${this.lastSequence}`;
     this.socket = new WebSocket(url);
-    this.socket.onopen = () => this.onState("connected");
+    this.socket.onopen = () => {
+      this.onState("connected");
+      if (this.pendingAnswer) this.socket?.send(JSON.stringify(this.pendingAnswer));
+    };
     this.socket.onmessage = (message) => {
       const event = JSON.parse(message.data as string) as ServerEvent;
       if (event.sequence > 0) this.lastSequence = Math.max(this.lastSequence, event.sequence);
+      if (
+        event.type === "input.ack"
+        && event.payload.client_event_id === this.pendingAnswer?.event_id
+      ) {
+        this.pendingAnswer = null;
+      }
       this.onEvent(event);
     };
     this.socket.onclose = () => {
@@ -54,15 +80,19 @@ export class InterviewSocket {
     };
   }
 
-  send(type: "user.text.submit" | "session.pause" | "session.finish", payload = {}) {
+  send(type: ClientEventType, payload: Record<string, unknown> = {}) {
     if (this.socket?.readyState !== WebSocket.OPEN) return false;
     this.clientSequence += 1;
-    this.socket.send(JSON.stringify({
+    const event: ClientEvent = {
       event_id: crypto.randomUUID(),
       type,
       sequence: this.clientSequence,
       payload,
-    }));
+    };
+    if (type === "user.text.submit" || type === "user.answer.commit") {
+      this.pendingAnswer = event;
+    }
+    this.socket.send(JSON.stringify(event));
     return true;
   }
 

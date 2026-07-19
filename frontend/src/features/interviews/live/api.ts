@@ -4,7 +4,7 @@ import type { RealtimeMessage } from "../../../lib/realtime/interviewSocket";
 
 export interface InterviewSession {
   id: string;
-  status: "ready" | "interviewing" | "paused" | "completed" | "failed";
+  status: "ready" | "interviewing" | "paused" | "completing" | "completed" | "evaluating" | "failed";
   started_at: string | null;
   ended_at: string | null;
   current_question_sequence: number | null;

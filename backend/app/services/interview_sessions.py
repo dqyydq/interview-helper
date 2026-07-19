@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.errors import AppError
 from app.context.segmentation import close_current_segment
 from app.db.models.common import (
+    JobStatus,
+    JobType,
     MessageRole,
     PlanStatus,
     SessionStatus,
@@ -25,6 +27,7 @@ from app.db.models.interview import (
     InterviewSession,
     PlanQuestion,
 )
+from app.db.models.job import BackgroundJob
 from app.realtime.state_machine import ensure_transition
 from app.schemas.context import (
     ContextDiagnosticsPublic,
@@ -322,6 +325,8 @@ async def resume_session(session: AsyncSession, interview: InterviewSession) -> 
 
 async def finish_session(session: AsyncSession, interview: InterviewSession) -> InterviewSession:
     if interview.status == SessionStatus.COMPLETED:
+        await _ensure_evaluation_job(session, interview)
+        await session.commit()
         return interview
     context = await session.scalar(
         select(InterviewContextState).where(InterviewContextState.session_id == interview.id)
@@ -341,5 +346,29 @@ async def finish_session(session: AsyncSession, interview: InterviewSession) -> 
     interview.status = SessionStatus.COMPLETED
     interview.ended_at = interview.ended_at or utc_now()
     interview.touch()
+    await _ensure_evaluation_job(session, interview)
     await session.commit()
     return interview
+
+
+async def _ensure_evaluation_job(
+    session: AsyncSession,
+    interview: InterviewSession,
+) -> BackgroundJob:
+    idempotency_key = f"interview-evaluation:{interview.id}:v1"
+    existing = await session.scalar(
+        select(BackgroundJob).where(BackgroundJob.idempotency_key == idempotency_key)
+    )
+    if existing:
+        return existing
+    job = BackgroundJob(
+        profile_id=interview.profile_id,
+        job_type=JobType.INTERVIEW_EVALUATION,
+        status=JobStatus.QUEUED,
+        payload={"session_id": str(interview.id)},
+        idempotency_key=idempotency_key,
+        max_attempts=3,
+    )
+    session.add(job)
+    await session.flush()
+    return job

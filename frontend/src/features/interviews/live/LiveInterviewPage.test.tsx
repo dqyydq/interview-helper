@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,12 +10,22 @@ vi.mock("./api", () => ({ liveInterviewApi: { start: vi.fn(), diagnostics: vi.fn
 
 class WebSocketStub {
   static OPEN = 1;
+  static latest: WebSocketStub;
   readyState = 1;
-  onopen: (() => void) | null = null;
+  private openHandler: (() => void) | null = null;
+  set onopen(handler: (() => void) | null) {
+    this.openHandler = handler;
+    if (handler) queueMicrotask(handler);
+  }
+  get onopen() { return this.openHandler; }
   onmessage: ((event: MessageEvent) => void) | null = null;
   onclose: (() => void) | null = null;
   send = vi.fn();
   close = vi.fn();
+
+  constructor() {
+    WebSocketStub.latest = this;
+  }
 }
 
 describe("LiveInterviewPage", () => {
@@ -100,6 +110,24 @@ describe("LiveInterviewPage", () => {
     expect(await screen.findByText("请设计一个多模型网关。")).toBeInTheDocument();
     expect(screen.getByText("面试中不显示评分")).toBeInTheDocument();
     expect(screen.getByLabelText("你的回答")).toBeEnabled();
+    expect(screen.getByText(/^\d{2}:\d{2}$/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重述问题" }));
+    await waitFor(() => expect(WebSocketStub.latest.send).toHaveBeenCalled());
+    expect(WebSocketStub.latest.send.mock.calls.at(-1)?.[0]).toContain("session.restate");
+    act(() => WebSocketStub.latest.onmessage?.({
+      data: JSON.stringify({
+        event_id: "state-paused",
+        session_id: "session-1",
+        type: "session.state",
+        sequence: 2,
+        timestamp: new Date().toISOString(),
+        payload: { status: "paused" },
+      }),
+    } as MessageEvent));
+    expect(await screen.findByRole("button", { name: "继续" })).toBeEnabled();
+    expect(screen.getByLabelText("你的回答")).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "继续" }));
+    expect(WebSocketStub.latest.send.mock.calls.at(-1)?.[0]).toContain("session.resume");
     expect(await screen.findByText("2,100 / 3,000")).toBeInTheDocument();
     expect(screen.getByText("70%")).toBeInTheDocument();
   });
