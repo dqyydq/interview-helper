@@ -12,6 +12,7 @@ from app.api.routes import (
     report_coach,
     reports,
     resumes,
+    transcriptions,
 )
 
 api_router = APIRouter()
@@ -22,6 +23,7 @@ api_router.include_router(questions.router)
 api_router.include_router(reports.router)
 api_router.include_router(report_coach.router)
 api_router.include_router(resumes.router)
+api_router.include_router(transcriptions.router)
 api_router.include_router(interview_plans.router)
 api_router.include_router(interview_sessions.router)
 api_router.include_router(context_diagnostics.router)

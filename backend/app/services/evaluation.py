@@ -22,6 +22,7 @@ from app.db.models.evaluation import (
     QuestionEvaluation,
 )
 from app.db.models.interview import (
+    AnswerAttachment,
     InterviewConfig,
     InterviewMessage,
     InterviewPlan,
@@ -36,6 +37,7 @@ from app.schemas.evaluation import (
     EvaluationDraft,
     EvaluationJobPublic,
     EvaluationReportPublic,
+    EvidenceAttachmentPublic,
     EvidenceMessagePublic,
     EvidenceReference,
     PracticeAction,
@@ -186,6 +188,7 @@ def _evaluation_payload(
     round_profile: RoundProfile,
     questions: Sequence[PlanQuestion],
     messages: Sequence[InterviewMessage],
+    attachments_by_message: dict[uuid.UUID, list[AnswerAttachment]],
     expected_dimensions: list[str],
 ) -> dict:
     return {
@@ -217,6 +220,18 @@ def _evaluation_payload(
                 "role": str(message.role),
                 "confirmed": message.confirmed,
                 "content": message.content,
+                "attachments": [
+                    {
+                        "id": str(attachment.id),
+                        "type": str(attachment.attachment_type),
+                        "language": attachment.language,
+                        "filename": attachment.filename,
+                        "size_bytes": attachment.size_bytes,
+                        "content": attachment.content,
+                        "execution_allowed": False,
+                    }
+                    for attachment in attachments_by_message.get(message.id, [])
+                ],
             }
             for message in messages
         ],
@@ -283,6 +298,22 @@ async def evaluate_interview(
         actual_provider = build_provider(connection)
     dimensions = _expected_dimensions(round_profile)
     question_ids = _question_message_ids(questions, messages)
+    message_ids = [message.id for message in messages]
+    attachments = list(
+        (
+            await session.scalars(
+                select(AnswerAttachment)
+                .where(
+                    AnswerAttachment.message_id.in_(message_ids),
+                    AnswerAttachment.deleted_at.is_(None),
+                )
+                .order_by(AnswerAttachment.created_at)
+            )
+        ).all()
+    ) if message_ids else []
+    attachments_by_message: dict[uuid.UUID, list[AnswerAttachment]] = {}
+    for attachment in attachments:
+        attachments_by_message.setdefault(attachment.message_id, []).append(attachment)
     payload = _evaluation_payload(
         plan=plan,
         config=config,
@@ -290,6 +321,7 @@ async def evaluate_interview(
         round_profile=round_profile,
         questions=questions,
         messages=messages,
+        attachments_by_message=attachments_by_message,
         expected_dimensions=dimensions,
     )
     try:
@@ -448,6 +480,21 @@ async def report_public(
             )
         ).all()
     ) if evidence_ids else []
+    evidence_attachments = list(
+        (
+            await session.scalars(
+                select(AnswerAttachment)
+                .where(
+                    AnswerAttachment.message_id.in_(evidence_ids),
+                    AnswerAttachment.deleted_at.is_(None),
+                )
+                .order_by(AnswerAttachment.created_at)
+            )
+        ).all()
+    ) if evidence_ids else []
+    evidence_attachments_by_message: dict[uuid.UUID, list[AnswerAttachment]] = {}
+    for attachment in evidence_attachments:
+        evidence_attachments_by_message.setdefault(attachment.message_id, []).append(attachment)
     job = await session.scalar(
         select(BackgroundJob)
         .where(
@@ -513,6 +560,17 @@ async def report_public(
                 plan_question_id=item.plan_question_id,
                 sequence=item.sequence,
                 content=item.content,
+                attachments=[
+                    EvidenceAttachmentPublic(
+                        id=attachment.id,
+                        language=attachment.language,
+                        filename=attachment.filename,
+                        content=attachment.content or "",
+                        size_bytes=attachment.size_bytes,
+                    )
+                    for attachment in evidence_attachments_by_message.get(item.id, [])
+                    if attachment.content is not None
+                ],
             )
             for item in evidence_messages
         ],

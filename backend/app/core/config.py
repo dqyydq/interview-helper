@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     )
     upload_dir: Path = REPOSITORY_ROOT / "data" / "uploads"
     resume_upload_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1_024)
+    audio_upload_max_bytes: int = Field(default=15 * 1024 * 1024, ge=1_024)
     job_poll_interval_seconds: float = Field(default=0.5, ge=0.05, le=10.0)
 
 

@@ -8,9 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.errors import AppError
 from app.context.builder import build_interviewer_context
 from app.context.segmentation import close_current_segment, get_open_segment
-from app.db.models.common import MessageRole, ModelRole, SessionStatus, utc_now
+from app.db.models.common import AttachmentType, MessageRole, ModelRole, SessionStatus, utc_now
 from app.db.models.context import InterviewContextState
 from app.db.models.interview import (
+    AnswerAttachment,
     InterviewMessage,
     InterviewPlan,
     InterviewSession,
@@ -19,6 +20,7 @@ from app.db.models.interview import (
 from app.providers.base import ChatProvider
 from app.providers.factory import build_provider
 from app.providers.types import ChatRequest
+from app.schemas.attachments import CodeAttachmentInput
 from app.services.model_connections import resolve_role_connection
 
 
@@ -47,6 +49,7 @@ async def save_user_answer(
     content: str,
     *,
     client_event_id: str | None = None,
+    attachments: list[CodeAttachmentInput] | None = None,
 ) -> InterviewMessage:
     await session.refresh(interview, with_for_update=True)
     if interview.status != SessionStatus.INTERVIEWING:
@@ -84,6 +87,7 @@ async def save_user_answer(
         if context and context.current_plan_question_id
         else None
     )
+    submitted_attachments = attachments or []
     message = InterviewMessage(
         session_id=interview.id,
         plan_question_id=context.current_plan_question_id if context else None,
@@ -93,10 +97,25 @@ async def save_user_answer(
         content=text,
         message_metadata={
             "kind": "answer",
+            "attachment_count": len(submitted_attachments),
             **({"client_event_id": client_event_id} if client_event_id else {}),
         },
     )
     session.add(message)
+    await session.flush()
+    for attachment in submitted_attachments:
+        session.add(
+            AnswerAttachment(
+                message_id=message.id,
+                attachment_type=AttachmentType.CODE,
+                filename=attachment.filename,
+                mime_type="text/plain",
+                language=attachment.language,
+                content=attachment.content,
+                size_bytes=len(attachment.content.encode("utf-8")),
+                attachment_metadata={"execution_allowed": False},
+            )
+        )
     await session.commit()
     await session.refresh(message)
     return message

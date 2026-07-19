@@ -9,6 +9,7 @@ export const modelRoles = [
   "researcher",
   "coach",
   "embedding",
+  "transcriber",
 ] as const;
 
 export type ModelRole = (typeof modelRoles)[number];

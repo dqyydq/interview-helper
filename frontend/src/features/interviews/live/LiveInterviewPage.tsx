@@ -1,11 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
-import { Clock3, LoaderCircle, Pause, Play, RotateCcw, Send, ShieldCheck, Square } from "lucide-react";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { Clock3, Code2, LoaderCircle, Pause, Play, RotateCcw, Send, ShieldCheck, Square } from "lucide-react";
+import { lazy, Suspense, type FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { InterviewSocket, type RealtimeMessage, type ServerEvent } from "../../../lib/realtime/interviewSocket";
 import { ContextUsage } from "../../diagnostics/ContextUsage";
+import { VoiceRecorder } from "../../live-interview/VoiceRecorder";
+import type { CodeAttachmentDraft } from "../../live-interview/CodeWhiteboard";
 import { liveInterviewApi } from "./api";
+
+const CodeWhiteboard = lazy(() =>
+  import("../../live-interview/CodeWhiteboard").then((module) => ({
+    default: module.CodeWhiteboard,
+  })),
+);
 
 export function LiveInterviewPage() {
   const { sessionId = "" } = useParams();
@@ -18,6 +26,7 @@ export function LiveInterviewPage() {
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [connection, setConnection] = useState<"connecting" | "connected" | "reconnecting">("connecting");
   const [error, setError] = useState<string>();
+  const [codeAttachments, setCodeAttachments] = useState<CodeAttachmentDraft[]>([]);
   const socketRef = useRef<InterviewSocket | null>(null);
   const session = useQuery({
     queryKey: ["interview-session", sessionId],
@@ -77,8 +86,9 @@ export function LiveInterviewPage() {
     event.preventDefault();
     const text = draft.trim();
     if (!text || busy) return;
-    if (socketRef.current?.send("user.text.submit", { text })) {
+    if (socketRef.current?.send("user.text.submit", { text, attachments: codeAttachments })) {
       setDraft("");
+      setCodeAttachments([]);
       setBusy(true);
       setError(undefined);
     }
@@ -134,6 +144,30 @@ export function LiveInterviewPage() {
       </aside>
       <form className="answer-composer" onSubmit={submit}>
         <label htmlFor="answer-text">你的回答</label>
+        <VoiceRecorder
+          disabled={busy || status !== "interviewing" || connection !== "connected"}
+          onConfirm={(text) => setDraft((current) => current.trim() ? `${current.trim()}\n${text}` : text)}
+        />
+        <div className="answer-tools">
+          <Suspense fallback={<span className="whiteboard-loading">正在加载代码白板…</span>}>
+            <CodeWhiteboard
+              disabled={busy || status !== "interviewing" || connection !== "connected"}
+              onAttach={(attachment) => setCodeAttachments([attachment])}
+            />
+          </Suspense>
+          {codeAttachments.map((attachment) => (
+            <span className="answer-attachment" key={`${attachment.language}-${attachment.filename}`}>
+              <Code2 size={13} aria-hidden="true" /> {attachment.filename}
+              <button
+                type="button"
+                aria-label={`移除 ${attachment.filename}`}
+                onClick={() => setCodeAttachments([])}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
         <textarea id="answer-text" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={busy || status !== "interviewing" || connection !== "connected"} placeholder="先给结论，再说明依据、取舍与边界。" />
         <div><small>{draft.length} / 50000</small><button className="primary-button" type="submit" disabled={!draft.trim() || busy || connection !== "connected"}><Send size={15} />{busy ? "等待面试官" : "确认回答"}</button></div>
       </form>

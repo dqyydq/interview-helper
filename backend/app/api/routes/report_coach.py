@@ -8,7 +8,7 @@ from app.api.deps import SessionDep
 from app.api.errors import AppError
 from app.db.models.common import ModelRole
 from app.db.models.evaluation import QuestionEvaluation
-from app.db.models.interview import InterviewMessage, InterviewSession
+from app.db.models.interview import AnswerAttachment, InterviewMessage, InterviewSession
 from app.providers.factory import build_provider
 from app.schemas.evaluation import CoachModeRequest, CoachResponse, EvidenceReference
 from app.services import evaluation as evaluation_service
@@ -63,6 +63,21 @@ async def coach_report(
             )
         ).all()
     ) if evidence_ids else []
+    attachments = list(
+        (
+            await session.scalars(
+                select(AnswerAttachment)
+                .where(
+                    AnswerAttachment.message_id.in_(evidence_ids),
+                    AnswerAttachment.deleted_at.is_(None),
+                )
+                .order_by(AnswerAttachment.created_at)
+            )
+        ).all()
+    ) if evidence_ids else []
+    attachments_by_message: dict[uuid.UUID, list[AnswerAttachment]] = {}
+    for attachment in attachments:
+        attachments_by_message.setdefault(attachment.message_id, []).append(attachment)
     interview = await session.get(InterviewSession, report.session_id)
     if not interview:
         raise AppError(
@@ -90,7 +105,27 @@ async def coach_report(
             else None
         ),
         "original_answers": [
-            {"message_id": str(item.id), "content": item.content} for item in messages
+            {
+                "message_id": str(item.id),
+                "content": item.content,
+                **(
+                    {
+                        "attachments": [
+                            {
+                                "id": str(attachment.id),
+                                "language": attachment.language,
+                                "filename": attachment.filename,
+                                "content": attachment.content,
+                                "execution_allowed": False,
+                            }
+                            for attachment in attachments_by_message.get(item.id, [])
+                        ]
+                    }
+                    if attachments_by_message.get(item.id)
+                    else {}
+                ),
+            }
+            for item in messages
         ],
     }
     connection = await resolve_role_connection(session, profile.id, ModelRole.COACH)

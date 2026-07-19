@@ -28,6 +28,7 @@ const roleLabels: Record<ModelRole, string> = {
   researcher: "公司研究",
   coach: "训练教练",
   embedding: "向量检索",
+  transcriber: "语音转写",
 };
 
 const initialDraft: ConnectionDraft = {
@@ -309,6 +310,11 @@ export function ModelSettingsPage() {
             {modelRoles.map((role) => {
               const binding = bindings.data?.find((item) => item.role === role);
               const required = role === "interviewer" || role === "evaluator";
+              const roleConnections = role === "transcriber"
+                ? connections.data?.filter(
+                    (connection) => connection.provider_type === "openai_compatible",
+                  )
+                : connections.data;
               return (
                 <label className="role-row" key={role}>
                   <span>
@@ -325,7 +331,7 @@ export function ModelSettingsPage() {
                     }}
                   >
                     <option value="">{required ? "请选择连接" : "使用回退策略"}</option>
-                    {connections.data?.map((connection) => (
+                    {roleConnections?.map((connection) => (
                       <option key={connection.id} value={connection.id}>
                         {connection.name} · {connection.model_name}
                       </option>

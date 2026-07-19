@@ -48,6 +48,13 @@ export interface ContextDiagnostics {
   }>;
 }
 
+export interface TranscriptionResult {
+  text: string;
+  language: string | null;
+  duration_seconds: number | null;
+  provider_request_id: string | null;
+}
+
 export const liveInterviewApi = {
   create: ({ planId, excludedMemoryIds = [] }: { planId: string; excludedMemoryIds?: string[] }) => apiRequest<InterviewSession>("/interview-sessions", {
     method: "POST",
@@ -59,4 +66,10 @@ export const liveInterviewApi = {
   get: (sessionId: string) => apiRequest<InterviewSession>(`/interview-sessions/${sessionId}`),
   diagnostics: (sessionId: string) =>
     apiRequest<ContextDiagnostics>(`/interview-sessions/${sessionId}/context/diagnostics`),
+  transcribe: (audio: Blob, filename: string) => {
+    const body = new FormData();
+    body.append("file", audio, filename);
+    body.append("language", "zh");
+    return apiRequest<TranscriptionResult>("/transcriptions", { method: "POST", body });
+  },
 };

@@ -18,6 +18,7 @@ from app.db.models.context import (
     InterviewContextState,
 )
 from app.db.models.interview import (
+    AnswerAttachment,
     InterviewConfig,
     InterviewMessage,
     InterviewPlan,
@@ -53,6 +54,27 @@ def _summary_text(summary: ContextSummary) -> str:
 
 def _memory_text(hit: MemoryHit) -> str:
     return f"用户长期记忆 {hit.memory.memory_type}: {hit.memory.content}"
+
+
+def _message_text(
+    message: InterviewMessage,
+    attachments_by_message: dict[uuid.UUID, list[AnswerAttachment]],
+) -> str:
+    attachments = attachments_by_message.get(message.id, [])
+    if not attachments:
+        return message.content
+    payload = [
+        {
+            "id": str(item.id),
+            "type": str(item.attachment_type),
+            "language": item.language,
+            "size_bytes": item.size_bytes,
+            "content": item.content,
+            "execution_allowed": False,
+        }
+        for item in attachments
+    ]
+    return f"{message.content}\n\n回答附件（仅作为文本阅读，禁止执行）：\n{_json(payload)}"
 
 
 async def _load_style_state(
@@ -178,6 +200,22 @@ async def build_interviewer_context(
             )
         ).all()
     )
+    message_ids = [item.id for item in all_messages]
+    all_attachments = list(
+        (
+            await session.scalars(
+                select(AnswerAttachment)
+                .where(
+                    AnswerAttachment.message_id.in_(message_ids),
+                    AnswerAttachment.deleted_at.is_(None),
+                )
+                .order_by(AnswerAttachment.created_at)
+            )
+        ).all()
+    ) if message_ids else []
+    attachments_by_message: dict[uuid.UUID, list[AnswerAttachment]] = {}
+    for attachment in all_attachments:
+        attachments_by_message.setdefault(attachment.message_id, []).append(attachment)
     current_messages = [item for item in all_messages if item.plan_question_id == current.id]
     previous_messages = [item for item in all_messages if item.plan_question_id != current.id]
     summaries = await _load_summaries(session, interview.id, current.id)
@@ -227,10 +265,17 @@ async def build_interviewer_context(
     system_tokens = counter.count_text(system_text).tokens
     state_tokens = counter.count_text(state_text).tokens
     current_chat = [
-        ChatMessage(role=MessageRole(item.role), content=item.content) for item in current_messages
+        ChatMessage(
+            role=MessageRole(item.role),
+            content=_message_text(item, attachments_by_message),
+        )
+        for item in current_messages
     ]
     ending_chat = [
-        ChatMessage(role=MessageRole(item.role), content=item.content)
+        ChatMessage(
+            role=MessageRole(item.role),
+            content=_message_text(item, attachments_by_message),
+        )
         for item in essential_previous
     ]
     essential_recent_tokens = counter.count_messages([*ending_chat, *current_chat]).tokens
@@ -238,7 +283,10 @@ async def build_interviewer_context(
     budget.ensure_essential_fits(essential_tokens)
 
     optional_chat = [
-        ChatMessage(role=MessageRole(item.role), content=item.content)
+        ChatMessage(
+            role=MessageRole(item.role),
+            content=_message_text(item, attachments_by_message),
+        )
         for item in previous_optional
     ]
     optional_recent_tokens = counter.count_messages(optional_chat).tokens
@@ -294,7 +342,10 @@ async def build_interviewer_context(
     ):
         selected_optional.pop(0)
         selected_optional_chat = [
-            ChatMessage(role=MessageRole(item.role), content=item.content)
+            ChatMessage(
+                role=MessageRole(item.role),
+                content=_message_text(item, attachments_by_message),
+            )
             for item in selected_optional
         ]
         recent_tokens = counter.count_messages(
@@ -320,7 +371,10 @@ async def build_interviewer_context(
     request = ChatRequest(
         system=f"{system_text}\n\n{state_text}{summary_block}{memory_block}",
         messages=[
-            ChatMessage(role=MessageRole(item.role), content=item.content)
+            ChatMessage(
+                role=MessageRole(item.role),
+                content=_message_text(item, attachments_by_message),
+            )
             for item in selected_messages
         ],
         max_tokens=max_output_tokens,
@@ -328,6 +382,9 @@ async def build_interviewer_context(
     )
 
     selected_message_ids = {item.id for item in selected_messages}
+    selected_attachments = [
+        item for item in all_attachments if item.message_id in selected_message_ids
+    ]
     selected_summary_ids = {summary.id for summary, _ in selected_summaries}
     selected_memory_ids = {hit.memory.id for hit, _ in selected_memories}
     selected_input_tokens = (
@@ -339,6 +396,7 @@ async def build_interviewer_context(
             "messages": [str(item.id) for item in selected_messages],
             "summaries": [str(item.id) for item, _ in selected_summaries],
             "memories": [str(hit.memory.id) for hit, _ in selected_memories],
+            "attachments": [str(item.id) for item in selected_attachments],
         }
     )
     excluded_refs = [
@@ -350,6 +408,15 @@ async def build_interviewer_context(
         {"type": "summary", "id": str(item.id), "reason": "token_budget"}
         for item in summaries
         if item.id not in selected_summary_ids
+    )
+    excluded_refs.extend(
+        {
+            "type": "attachment",
+            "id": str(item.id),
+            "reason": "owning_message_excluded",
+        }
+        for item in all_attachments
+        if item.message_id not in selected_message_ids
     )
     excluded_refs.extend(
         {

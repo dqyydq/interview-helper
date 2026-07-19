@@ -87,11 +87,20 @@ class EvaluationJobPublic(EntityPublic):
     error_message: str | None
 
 
+class EvidenceAttachmentPublic(ApiModel):
+    id: uuid.UUID
+    language: str | None
+    filename: str | None
+    content: str
+    size_bytes: int
+
+
 class EvidenceMessagePublic(ApiModel):
     id: uuid.UUID
     plan_question_id: uuid.UUID | None
     sequence: int
     content: str
+    attachments: list[EvidenceAttachmentPublic] = Field(default_factory=list)
 
 
 class QuestionEvaluationPublic(EntityPublic):

@@ -15,6 +15,7 @@ from app.providers.types import StreamEventType, Usage
 from app.realtime.connection_manager import connection_manager
 from app.realtime.event_store import append_event, find_client_event, replay_events
 from app.realtime.events import ClientEvent, ServerEvent
+from app.schemas.attachments import AnswerCommitPayload
 from app.services import interview_sessions
 from app.services.interview_orchestrator import (
     prepare_turn,
@@ -249,11 +250,22 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                     continue
                 if interview.status == SessionStatus.READY:
                     interview = await interview_sessions.start_session(session, interview)
+                try:
+                    answer_payload = AnswerCommitPayload.model_validate(incoming.payload)
+                except ValidationError:
+                    await _send_protocol_error(
+                        websocket,
+                        session_id,
+                        "answer_payload_invalid",
+                        "回答或代码附件格式不符合要求",
+                    )
+                    continue
                 answer = await save_user_answer(
                     session,
                     interview,
-                    str(incoming.payload.get("text", "")),
+                    answer_payload.text,
                     client_event_id=str(incoming.event_id),
+                    attachments=answer_payload.attachments,
                 )
                 ack = await append_event(
                     session,

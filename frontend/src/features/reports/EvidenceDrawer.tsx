@@ -48,6 +48,15 @@ export function EvidenceDrawer({ evidence, message, onClose }: EvidenceDrawerPro
               MESSAGE {String(message.sequence).padStart(2, "0")}
             </div>
             <blockquote>{message.content}</blockquote>
+            {message.attachments?.map((attachment) => (
+              <section className="evidence-code" key={attachment.id}>
+                <header>
+                  <strong>{attachment.filename || "代码附件"}</strong>
+                  <span>{attachment.language || "text"} · {attachment.size_bytes.toLocaleString("zh-CN")} bytes</span>
+                </header>
+                <pre><code>{attachment.content}</code></pre>
+              </section>
+            ))}
             <dl>
               <div>
                 <dt>评估引用</dt>

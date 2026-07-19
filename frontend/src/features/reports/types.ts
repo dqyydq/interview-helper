@@ -30,6 +30,13 @@ export interface EvidenceMessage {
   plan_question_id: string | null;
   sequence: number;
   content: string;
+  attachments?: Array<{
+    id: string;
+    language: string | null;
+    filename: string | null;
+    content: string;
+    size_bytes: number;
+  }>;
 }
 
 export interface QuestionEvaluation {

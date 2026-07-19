@@ -8,6 +8,7 @@ from sqlalchemy import delete, select
 
 from app.api.routes import report_coach as coach_route
 from app.db.models.common import (
+    AttachmentType,
     EvaluationStatus,
     JobStatus,
     JobType,
@@ -23,6 +24,7 @@ from app.db.models.evaluation import (
     QuestionEvaluation,
 )
 from app.db.models.interview import (
+    AnswerAttachment,
     InterviewConfig,
     InterviewMessage,
     InterviewPlan,
@@ -250,6 +252,20 @@ async def test_evaluation_persists_only_raw_answer_evidence_and_report_api(
     client: AsyncClient,
 ) -> None:
     _, interview, questions, answers = await _seed_finished_interview()
+    async with async_session_factory() as session:
+        session.add(
+            AnswerAttachment(
+                message_id=answers[0].id,
+                attachment_type=AttachmentType.CODE,
+                filename="solution.py",
+                mime_type="text/plain",
+                language="python",
+                content="def solve():\n    return 42",
+                size_bytes=26,
+                attachment_metadata={"execution_allowed": False},
+            )
+        )
+        await session.commit()
     provider = ReportProvider(_response(questions, answers))
     async with async_session_factory() as session:
         interview_row = await session.get(InterviewSession, interview.id)
@@ -261,6 +277,12 @@ async def test_evaluation_persists_only_raw_answer_evidence_and_report_api(
     request_payload = json.loads(provider.requests[0].messages[0].content)
     assert request_payload["contract"]["style_pack_version"] == 3
     assert len(request_payload["interview_messages"]) == 4
+    answer_payload = next(
+        item for item in request_payload["interview_messages"]
+        if item["message_id"] == str(answers[0].id)
+    )
+    assert answer_payload["attachments"][0]["content"] == "def solve():\n    return 42"
+    assert answer_payload["attachments"][0]["execution_allowed"] is False
 
     response = await client.get(f"/api/reports/{report_id}")
     assert response.status_code == 200
@@ -272,6 +294,10 @@ async def test_evaluation_persists_only_raw_answer_evidence_and_report_api(
     assert {item["id"] for item in body["evidence_messages"]} == {
         str(item.id) for item in answers
     }
+    evidence_answer = next(
+        item for item in body["evidence_messages"] if item["id"] == str(answers[0].id)
+    )
+    assert evidence_answer["attachments"][0]["filename"] == "solution.py"
     assert all(item["confidence"] > 0 for item in body["questions"])
 
     listing = await client.get("/api/reports")

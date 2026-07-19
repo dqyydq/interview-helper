@@ -7,6 +7,21 @@ import { liveInterviewApi } from "./api";
 import { LiveInterviewPage } from "./LiveInterviewPage";
 
 vi.mock("./api", () => ({ liveInterviewApi: { start: vi.fn(), diagnostics: vi.fn() } }));
+vi.mock("../../live-interview/CodeWhiteboard", () => ({
+  CodeWhiteboard: ({ onAttach }: { onAttach: (attachment: Record<string, string>) => void }) => (
+    <button
+      type="button"
+      onClick={() => onAttach({
+        attachment_type: "code",
+        language: "python",
+        filename: "solution.py",
+        content: "print('answer')",
+      })}
+    >
+      附加测试代码
+    </button>
+  ),
+}));
 
 class WebSocketStub {
   static OPEN = 1;
@@ -111,6 +126,20 @@ describe("LiveInterviewPage", () => {
     expect(screen.getByText("面试中不显示评分")).toBeInTheDocument();
     expect(screen.getByLabelText("你的回答")).toBeEnabled();
     expect(screen.getByText(/^\d{2}:\d{2}$/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "附加测试代码" }));
+    fireEvent.change(screen.getByLabelText("你的回答"), { target: { value: "这是我的思路" } });
+    fireEvent.click(screen.getByRole("button", { name: "确认回答" }));
+    await waitFor(() => expect(WebSocketStub.latest.send).toHaveBeenCalled());
+    const submitted = JSON.parse(String(WebSocketStub.latest.send.mock.calls.at(-1)?.[0]));
+    expect(submitted.payload).toEqual({
+      text: "这是我的思路",
+      attachments: [{
+        attachment_type: "code",
+        language: "python",
+        filename: "solution.py",
+        content: "print('answer')",
+      }],
+    });
     fireEvent.click(screen.getByRole("button", { name: "重述问题" }));
     await waitFor(() => expect(WebSocketStub.latest.send).toHaveBeenCalled());
     expect(WebSocketStub.latest.send.mock.calls.at(-1)?.[0]).toContain("session.restate");

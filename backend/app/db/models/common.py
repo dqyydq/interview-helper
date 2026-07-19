@@ -184,6 +184,7 @@ class ModelRole(StrEnum):
     EVALUATOR = "evaluator"
     COACH = "coach"
     EMBEDDING = "embedding"
+    TRANSCRIBER = "transcriber"
 
 
 class ConnectionStatus(StrEnum):
