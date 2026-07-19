@@ -5,9 +5,10 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
 from app.api.errors import AppError
+from app.context.snapshot import finalize_context_snapshot
 from app.db.models.common import SessionStatus, utc_now
 from app.db.session import async_session_factory
-from app.providers.types import StreamEventType
+from app.providers.types import StreamEventType, Usage
 from app.realtime.event_store import append_event, find_client_event, replay_events
 from app.realtime.events import ClientEvent, ServerEvent
 from app.services import interview_sessions
@@ -131,6 +132,7 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                 try:
                     turn = await prepare_turn(session, interview)
                     content = ""
+                    usage: Usage | None = None
                     if turn.static_prompt:
                         content = turn.static_prompt
                         await _transient(websocket, session_id, content)
@@ -141,6 +143,8 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                                 if chunk.type == StreamEventType.TEXT_DELTA and chunk.text:
                                     content += chunk.text
                                     await _transient(websocket, session_id, chunk.text)
+                                elif chunk.type == StreamEventType.USAGE and chunk.usage:
+                                    usage = chunk.usage
                                 elif chunk.type == StreamEventType.FAILED:
                                     raise AppError(
                                         code=chunk.error_code or "provider_failed",
@@ -159,6 +163,11 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                             status_code=502,
                         )
                     message = await save_assistant_message(session, interview, turn, content)
+                    await finalize_context_snapshot(
+                        session,
+                        turn.context_snapshot_id,
+                        usage if not turn.static_prompt else None,
+                    )
                     final = await append_event(
                         session,
                         interview,

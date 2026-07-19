@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import AppError
 from app.db.models.common import MessageRole, PlanStatus, SessionStatus, utc_now
-from app.db.models.context import ConversationSegment, InterviewContextState
+from app.db.models.context import ContextSnapshot, ConversationSegment, InterviewContextState
 from app.db.models.interview import (
     InterviewConfig,
     InterviewMessage,
@@ -14,6 +14,7 @@ from app.db.models.interview import (
     PlanQuestion,
 )
 from app.realtime.state_machine import ensure_transition
+from app.schemas.context import ContextDiagnosticsPublic, ContextSnapshotPublic
 from app.schemas.interview_session import InterviewMessagePublic, InterviewSessionPublic
 from app.services.interview_planning import plan_public
 
@@ -76,6 +77,46 @@ async def session_public(
         failure_code=interview.failure_code,
         plan=await plan_public(session, plan),
         messages=[InterviewMessagePublic.model_validate(message) for message in messages],
+    )
+
+
+async def context_diagnostics(
+    session: AsyncSession,
+    interview: InterviewSession,
+) -> ContextDiagnosticsPublic:
+    context = await session.scalar(
+        select(InterviewContextState).where(InterviewContextState.session_id == interview.id)
+    )
+    snapshots = list(
+        (
+            await session.scalars(
+                select(ContextSnapshot)
+                .where(
+                    ContextSnapshot.session_id == interview.id,
+                    ContextSnapshot.deleted_at.is_(None),
+                )
+                .order_by(ContextSnapshot.created_at.desc())
+                .limit(20)
+            )
+        ).all()
+    )
+    current_state = (
+        {
+            "current_plan_question_id": str(context.current_plan_question_id)
+            if context.current_plan_question_id
+            else None,
+            "current_follow_up_index": context.current_follow_up_index,
+            "completed_question_ids": context.completed_question_ids,
+            "unresolved_points": context.unresolved_points,
+            "token_count": context.token_count,
+        }
+        if context
+        else {}
+    )
+    return ContextDiagnosticsPublic(
+        session_id=interview.id,
+        current_state=current_state,
+        snapshots=[ContextSnapshotPublic.model_validate(item) for item in snapshots],
     )
 
 

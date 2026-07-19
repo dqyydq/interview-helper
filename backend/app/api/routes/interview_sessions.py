@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, status
 
 from app.api.deps import SessionDep
+from app.schemas.context import ContextDiagnosticsPublic
 from app.schemas.interview_session import (
     InterviewSessionCreate,
     InterviewSessionPublic,
@@ -31,6 +32,16 @@ async def get_interview_session(
     profile = await ensure_local_profile(session)
     interview = await service.get_session(session, profile.id, session_id)
     return await service.session_public(session, interview)
+
+
+@router.get("/{session_id}/context/diagnostics", response_model=ContextDiagnosticsPublic)
+async def get_context_diagnostics(
+    session_id: uuid.UUID,
+    session: SessionDep,
+) -> ContextDiagnosticsPublic:
+    profile = await ensure_local_profile(session)
+    interview = await service.get_session(session, profile.id, session_id)
+    return await service.context_diagnostics(session, interview)
 
 
 @router.post("/{session_id}/start", response_model=InterviewSessionPublic)

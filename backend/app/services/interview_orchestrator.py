@@ -1,16 +1,17 @@
+import uuid
 from dataclasses import dataclass
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.interviewer import build_interviewer_request
 from app.api.errors import AppError
+from app.context.builder import build_interviewer_context
 from app.db.models.common import MessageRole, ModelRole, SessionStatus
 from app.db.models.context import InterviewContextState
 from app.db.models.interview import InterviewMessage, InterviewSession, PlanQuestion
 from app.providers.base import ChatProvider
 from app.providers.factory import build_provider
-from app.providers.types import ChatMessage, ChatRequest
+from app.providers.types import ChatRequest
 from app.services.model_connections import resolve_role_connection
 
 
@@ -20,6 +21,7 @@ class TurnPlan:
     static_prompt: str | None
     provider: ChatProvider | None
     request: ChatRequest | None
+    context_snapshot_id: uuid.UUID | None = None
 
 
 async def _next_message_sequence(session: AsyncSession, session_id) -> int:
@@ -98,25 +100,20 @@ async def prepare_turn(session: AsyncSession, interview: InterviewSession) -> Tu
             return TurnPlan(next_question, next_question.prompt_snapshot, None, None)
         return TurnPlan(current, "本场问题已经完成。你可以补充最后一点，或结束面试。", None, None)
     connection = await resolve_role_connection(session, interview.profile_id, ModelRole.INTERVIEWER)
-    recent = list(
-        (
-            await session.scalars(
-                select(InterviewMessage)
-                .where(InterviewMessage.session_id == interview.id)
-                .order_by(InterviewMessage.sequence.desc())
-                .limit(12)
-            )
-        ).all()
+    built = await build_interviewer_context(
+        session,
+        interview=interview,
+        current=current,
+        context=context,
+        connection=connection,
     )
-    recent.reverse()
-    request = build_interviewer_request(
-        current_question=current.prompt_snapshot,
-        messages=[
-            ChatMessage(role=MessageRole(item.role), content=item.content) for item in recent
-        ],
-        max_tokens=connection.max_output_tokens,
+    return TurnPlan(
+        current,
+        None,
+        build_provider(connection),
+        built.request,
+        built.snapshot_id,
     )
-    return TurnPlan(current, None, build_provider(connection), request)
 
 
 async def save_assistant_message(
