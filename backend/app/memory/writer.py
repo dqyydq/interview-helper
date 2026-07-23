@@ -166,7 +166,8 @@ async def remember(
         (
             item
             for item in versions
-            if item.status in {
+            if item.status
+            in {
                 MemoryStatus.PROPOSED,
                 MemoryStatus.ACTIVE,
                 MemoryStatus.CONFLICTED,

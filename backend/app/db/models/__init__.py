@@ -34,6 +34,7 @@ from app.db.models.question import (
     QuestionVariant,
 )
 from app.db.models.resume import Resume, ResumeClaim, ResumeSection
+from app.db.models.worker import WorkerHeartbeat
 
 __all__ = [
     "AnswerAttachment",
@@ -72,4 +73,5 @@ __all__ = [
     "SQLModel",
     "SummaryBundle",
     "UserProfile",
+    "WorkerHeartbeat",
 ]

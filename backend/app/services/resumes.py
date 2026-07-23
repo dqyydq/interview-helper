@@ -4,11 +4,12 @@ import zipfile
 from pathlib import Path
 
 import anyio
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import AppError
 from app.core.config import settings
+from app.core.security import isolated_upload_path, validated_existing_upload_path
 from app.db.models.common import JobStatus, JobType, ResumeParseStatus
 from app.db.models.job import BackgroundJob
 from app.db.models.resume import Resume, ResumeClaim, ResumeSection
@@ -213,14 +214,12 @@ async def _resume_job(
 
 async def _write_upload(
     profile_id: uuid.UUID,
-    content_hash: str,
     suffix: str,
     data: bytes,
 ) -> str:
-    directory = anyio.Path(settings.upload_dir) / profile_id.hex
-    await directory.mkdir(parents=True, exist_ok=True)
-    target = directory / f"{content_hash}{suffix}"
-    await target.write_bytes(data)
+    target = isolated_upload_path(profile_id, suffix)
+    await anyio.Path(target.parent).mkdir(parents=True, exist_ok=True)
+    await anyio.Path(target).write_bytes(data)
     return str(target)
 
 
@@ -270,7 +269,7 @@ async def create_resume_upload(
     )
     session.add(resume)
     await session.flush()
-    resume.storage_path = await _write_upload(profile_id, content_hash, suffix, data)
+    resume.storage_path = await _write_upload(profile_id, suffix, data)
     job = _new_parse_job(profile_id, resume, key_suffix="initial")
     session.add(job)
     await session.commit()
@@ -303,3 +302,29 @@ async def retry_resume_parse(
     await session.commit()
     await session.refresh(job)
     return job_public(job)
+
+
+async def delete_resume(
+    session: AsyncSession,
+    profile_id: uuid.UUID,
+    resume: Resume,
+) -> None:
+    storage_path: Path | None = None
+    if resume.storage_path:
+        try:
+            storage_path = validated_existing_upload_path(resume.storage_path, profile_id)
+        except ValueError:
+            storage_path = None
+    await session.execute(
+        delete(BackgroundJob).where(
+            BackgroundJob.profile_id == profile_id,
+            BackgroundJob.job_type == JobType.RESUME_PARSE,
+            BackgroundJob.payload["resume_id"].astext == str(resume.id),
+        )
+    )
+    await session.delete(resume)
+    await session.commit()
+    if storage_path:
+        path = anyio.Path(storage_path)
+        if await path.exists():
+            await path.unlink()

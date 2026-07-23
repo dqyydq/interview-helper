@@ -51,30 +51,38 @@ async def coach_report(
         for item in (question_evaluation.evidence if question_evaluation else [])
     ]
     evidence_ids = {item.message_id for item in evidence}
-    messages = list(
-        (
-            await session.scalars(
-                select(InterviewMessage)
-                .where(
-                    InterviewMessage.id.in_(evidence_ids),
-                    InterviewMessage.session_id == report.session_id,
+    messages = (
+        list(
+            (
+                await session.scalars(
+                    select(InterviewMessage)
+                    .where(
+                        InterviewMessage.id.in_(evidence_ids),
+                        InterviewMessage.session_id == report.session_id,
+                    )
+                    .order_by(InterviewMessage.sequence)
                 )
-                .order_by(InterviewMessage.sequence)
-            )
-        ).all()
-    ) if evidence_ids else []
-    attachments = list(
-        (
-            await session.scalars(
-                select(AnswerAttachment)
-                .where(
-                    AnswerAttachment.message_id.in_(evidence_ids),
-                    AnswerAttachment.deleted_at.is_(None),
+            ).all()
+        )
+        if evidence_ids
+        else []
+    )
+    attachments = (
+        list(
+            (
+                await session.scalars(
+                    select(AnswerAttachment)
+                    .where(
+                        AnswerAttachment.message_id.in_(evidence_ids),
+                        AnswerAttachment.deleted_at.is_(None),
+                    )
+                    .order_by(AnswerAttachment.created_at)
                 )
-                .order_by(AnswerAttachment.created_at)
-            )
-        ).all()
-    ) if evidence_ids else []
+            ).all()
+        )
+        if evidence_ids
+        else []
+    )
     attachments_by_message: dict[uuid.UUID, list[AnswerAttachment]] = {}
     for attachment in attachments:
         attachments_by_message.setdefault(attachment.message_id, []).append(attachment)

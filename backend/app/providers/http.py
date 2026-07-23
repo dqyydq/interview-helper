@@ -1,8 +1,30 @@
 import time
+from ipaddress import ip_address
+from urllib.parse import urlsplit
 
 import httpx
 
 from app.providers.base import ProviderError
+
+
+def trust_environment_for_provider_url(base_url: str) -> bool:
+    """Use configured proxies for remote providers, never for loopback endpoints.
+
+    A local OpenAI-compatible server is a supported development/runtime option.  Some
+    desktop environments set an all-traffic proxy without a correct ``NO_PROXY``
+    value, which would otherwise route ``127.0.0.1`` through that proxy and make a
+    healthy local provider appear unavailable.
+    """
+
+    hostname = urlsplit(base_url).hostname
+    if not hostname:
+        return True
+    if hostname.casefold() == "localhost":
+        return False
+    try:
+        return not ip_address(hostname).is_loopback
+    except ValueError:
+        return True
 
 
 def provider_error_from_response(response: httpx.Response) -> ProviderError:

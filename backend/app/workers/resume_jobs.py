@@ -1,17 +1,25 @@
 import uuid
 from datetime import timedelta
-from pathlib import Path
 
 import anyio
 import structlog
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.common import JobStatus, JobType, ResumeParseStatus, utc_now
+from app.agents.resume_structurer import ResumeStructureError, structure_resume_with_planner
+from app.api.errors import AppError
+from app.core.config import settings
+from app.core.security import validated_existing_upload_path
+from app.db.models.common import JobStatus, JobType, ModelRole, ResumeParseStatus, utc_now
 from app.db.models.job import BackgroundJob
 from app.db.models.resume import Resume, ResumeClaim, ResumeSection
 from app.db.session import async_session_factory
+from app.providers.base import ProviderError, StructuredOutputError
+from app.providers.factory import build_provider
+from app.services.model_connections import resolve_role_connection
 from app.services.resume_parser import (
+    ParsedClaim,
+    ParsedSection,
     ResumeParseError,
     extract_resume_claims,
     extract_resume_text,
@@ -19,6 +27,45 @@ from app.services.resume_parser import (
 )
 
 logger = structlog.get_logger(__name__)
+
+
+async def _structure_resume(
+    session: AsyncSession,
+    resume: Resume,
+    source_sections: list[ParsedSection],
+) -> tuple[list[ParsedSection], list[ParsedClaim], str, str | None]:
+    """Prefer the Planner role, but keep locally uploaded resumes usable without a model."""
+    fallback_claims = extract_resume_claims(source_sections)
+    provider = None
+    try:
+        connection = await resolve_role_connection(session, resume.profile_id, ModelRole.PLANNER)
+        provider = build_provider(connection)
+        structured = await structure_resume_with_planner(
+            provider,
+            source_sections,
+            context_window_tokens=connection.context_window_tokens,
+            max_output_tokens=connection.max_output_tokens,
+            tokenizer_type=connection.tokenizer_type,
+        )
+        return structured.sections, structured.claims, "planner-v1", None
+    except (
+        AppError,
+        ProviderError,
+        StructuredOutputError,
+        ResumeStructureError,
+        ValueError,
+    ) as exc:
+        reason = getattr(exc, "code", "structure_invalid")
+        await logger.awarning(
+            "resume_planner_fallback",
+            resume_id=str(resume.id),
+            fallback_reason=reason,
+        )
+        return source_sections, fallback_claims, "deterministic-v1", str(reason)
+    finally:
+        close = getattr(provider, "aclose", None)
+        if close:
+            await close()
 
 
 async def claim_next_resume_job(session: AsyncSession, worker_id: str) -> uuid.UUID | None:
@@ -96,6 +143,16 @@ async def process_resume_job(job_id: uuid.UUID) -> None:
             resume = await session.get(Resume, resume_id)
             if not resume or not resume.storage_path:
                 raise ResumeParseError("resume_source_missing", "简历源文件不存在")
+            try:
+                storage_path = validated_existing_upload_path(
+                    resume.storage_path,
+                    resume.profile_id,
+                )
+            except ValueError as exc:
+                raise ResumeParseError(
+                    "resume_source_invalid",
+                    "Resume source is outside the controlled upload directory.",
+                ) from exc
             resume.parse_status = ResumeParseStatus.PARSING
             resume.parse_error_code = None
             resume.touch()
@@ -103,13 +160,26 @@ async def process_resume_job(job_id: uuid.UUID) -> None:
             job.touch()
             await session.commit()
 
-            text = await anyio.to_thread.run_sync(
-                extract_resume_text,
-                Path(resume.storage_path),
-                resume.mime_type,
+            try:
+                with anyio.fail_after(settings.resume_parse_timeout_seconds):
+                    text = await anyio.to_thread.run_sync(
+                        extract_resume_text,
+                        storage_path,
+                        resume.mime_type,
+                        abandon_on_cancel=True,
+                    )
+            except TimeoutError as exc:
+                raise ResumeParseError(
+                    "resume_parse_timeout",
+                    "简历解析超时，任务将自动重试",
+                    retryable=True,
+                ) from exc
+            source_sections = split_resume_sections(text)
+            sections, claims, parser_name, fallback_reason = await _structure_resume(
+                session,
+                resume,
+                source_sections,
             )
-            sections = split_resume_sections(text)
-            claims = extract_resume_claims(sections)
 
             job.progress = 0.6
             job.touch()
@@ -125,7 +195,10 @@ async def process_resume_job(job_id: uuid.UUID) -> None:
                     heading=section.heading,
                     content=section.content,
                     sequence=section.sequence,
-                    section_metadata={"parser": "deterministic-v1"},
+                    section_metadata={
+                        "parser": parser_name,
+                        **({"fallback_reason": fallback_reason} if fallback_reason else {}),
+                    },
                 )
                 session.add(model)
                 await session.flush()
@@ -153,7 +226,8 @@ async def process_resume_job(job_id: uuid.UUID) -> None:
                 "resume_id": str(resume.id),
                 "section_count": len(sections),
                 "claim_count": len(claims),
-                "parser": "deterministic-v1",
+                "parser": parser_name,
+                **({"fallback_reason": fallback_reason} if fallback_reason else {}),
             }
             job.locked_at = None
             job.locked_by = None

@@ -102,8 +102,7 @@ async def build_candidate_pool(
                 capability = "delivery"
             else:
                 prompt = (
-                    f"你的简历提到了“{claim.content}”。"
-                    "请说明实际使用场景、核心原理和一个具体问题。"
+                    f"你的简历提到了“{claim.content}”。请说明实际使用场景、核心原理和一个具体问题。"
                 )
                 capability = "llm_fundamentals"
             candidates.append(

@@ -3,6 +3,7 @@ import shutil
 import uuid
 from pathlib import Path
 
+import anyio
 import pytest
 import pytest_asyncio
 from docx import Document
@@ -16,6 +17,8 @@ from app.db.models.resume import Resume
 from app.db.session import async_session_factory, engine
 from app.main import app
 from app.workers.resume_jobs import run_once
+
+OUTSIDE_UPLOAD_PATH = str(Path(__file__).resolve())
 
 
 async def clear_resume_data() -> None:
@@ -143,12 +146,8 @@ async def test_docx_and_markdown_resumes_parse_without_model_calls() -> None:
         assert markdown_upload.status_code == 201
         assert await run_once("test-worker") is True
         assert await run_once("test-worker") is True
-        docx_detail = await client.get(
-            f"/api/resumes/{docx_upload.json()['resume']['id']}"
-        )
-        markdown_detail = await client.get(
-            f"/api/resumes/{markdown_upload.json()['resume']['id']}"
-        )
+        docx_detail = await client.get(f"/api/resumes/{docx_upload.json()['resume']['id']}")
+        markdown_detail = await client.get(f"/api/resumes/{markdown_upload.json()['resume']['id']}")
 
     assert docx_detail.json()["parse_status"] == "ready"
     assert markdown_detail.json()["parse_status"] == "ready"
@@ -222,3 +221,60 @@ async def test_resume_upload_rejects_unsupported_mime_signature_size_and_empty_t
     assert empty.json()["code"] == "resume_file_empty"
     assert too_large.status_code == 413
     assert too_large.json()["code"] == "resume_file_too_large"
+
+
+@pytest.mark.asyncio
+async def test_resume_upload_uses_random_storage_name_and_delete_removes_file() -> None:
+    content = b"LLM application engineer with FastAPI and RAG experience"
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        uploaded = await client.post(
+            "/api/resumes",
+            files={"file": ("candidate.txt", content, "text/plain")},
+        )
+        assert uploaded.status_code == 201
+        resume_id = uploaded.json()["resume"]["id"]
+
+        async with async_session_factory() as session:
+            resume = await session.get(Resume, uuid.UUID(resume_id))
+            assert resume and resume.storage_path
+            storage_path = anyio.Path(resume.storage_path)
+            assert await storage_path.exists()
+            assert storage_path.parent.name == resume.profile_id.hex
+            assert storage_path.name != f"{resume.content_hash}.txt"
+
+        deleted = await client.delete(f"/api/resumes/{resume_id}")
+        missing = await client.get(f"/api/resumes/{resume_id}")
+
+    assert deleted.status_code == 204
+    assert not await storage_path.exists()
+    assert missing.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_resume_worker_rejects_a_tampered_storage_path_before_parsing() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        uploaded = await client.post(
+            "/api/resumes",
+            files={"file": ("candidate.txt", b"FastAPI and PostgreSQL", "text/plain")},
+        )
+        resume_id = uploaded.json()["resume"]["id"]
+        job_id = uploaded.json()["job"]["id"]
+        async with async_session_factory() as session:
+            resume = await session.get(Resume, uuid.UUID(resume_id))
+            assert resume is not None
+            resume.storage_path = OUTSIDE_UPLOAD_PATH
+            await session.commit()
+
+        assert await run_once("test-worker") is True
+        job = await client.get(f"/api/jobs/{job_id}")
+        detail = await client.get(f"/api/resumes/{resume_id}")
+
+    assert job.json()["status"] == "failed"
+    assert job.json()["error_code"] == "resume_source_invalid"
+    assert detail.json()["parse_status"] == "failed"

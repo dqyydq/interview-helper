@@ -13,6 +13,7 @@ import { InterviewSetupPage } from "../features/interviews/planning/InterviewSet
 import { LiveInterviewPage } from "../features/interviews/live/LiveInterviewPage";
 import { KnowledgeBasePage } from "../features/knowledge/KnowledgeBasePage";
 import { InterviewReportPage } from "../pages/InterviewReportPage";
+import { DiagnosticsPage } from "../pages/DiagnosticsPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { AppShell } from "./shell/AppShell";
 
@@ -57,6 +58,10 @@ export const appRoutes: RouteObject[] = [
       {
         path: "settings/memory",
         element: <MemorySettingsPage />,
+      },
+      {
+        path: "settings/diagnostics",
+        element: <DiagnosticsPage />,
       },
       { path: "*", element: <NotFoundPage /> },
     ],

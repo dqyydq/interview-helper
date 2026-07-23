@@ -29,9 +29,7 @@ class ModelConnectionCreate(ApiModel):
     @field_validator("extra_headers")
     @classmethod
     def validate_headers(cls, value: dict[str, str]) -> dict[str, str]:
-        invalid_length = any(
-            len(key) > 120 or len(item) > 2_000 for key, item in value.items()
-        )
+        invalid_length = any(len(key) > 120 or len(item) > 2_000 for key, item in value.items())
         if len(value) > 32 or invalid_length:
             raise ValueError("额外请求头数量或长度超出限制")
         return value

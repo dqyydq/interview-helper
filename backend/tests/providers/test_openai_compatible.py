@@ -5,8 +5,22 @@ import pytest
 
 from app.db.models.common import MessageRole
 from app.providers.base import ProviderError
+from app.providers.http import trust_environment_for_provider_url
 from app.providers.openai_compatible import OpenAICompatibleProvider
 from app.providers.types import ChatMessage, ChatRequest, StreamEventType, ToolDefinition
+
+
+@pytest.mark.parametrize(
+    ("base_url", "expected"),
+    [
+        ("http://127.0.0.1:8010/v1", False),
+        ("http://[::1]:8010/v1", False),
+        ("http://localhost:8010/v1", False),
+        ("https://api.openai.com/v1", True),
+    ],
+)
+def test_loopback_provider_urls_bypass_environment_proxy(base_url: str, expected: bool) -> None:
+    assert trust_environment_for_provider_url(base_url) is expected
 
 
 @pytest.mark.asyncio

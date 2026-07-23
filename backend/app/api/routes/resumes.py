@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from typing import Annotated
 
 import anyio
-from fastapi import APIRouter, File, Header, Request, UploadFile, status
+from fastapi import APIRouter, File, Header, Request, Response, UploadFile, status
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from app.api.deps import SessionDep
@@ -30,6 +30,7 @@ async def upload_resume(
 ) -> ResumeUploadResult:
     profile = await ensure_local_profile(session)
     data = await file.read(settings.resume_upload_max_bytes + 1)
+    await file.close()
     return await service.create_resume_upload(
         session,
         profile.id,
@@ -50,6 +51,14 @@ async def get_resume(resume_id: uuid.UUID, session: SessionDep) -> ResumePublic:
     profile = await ensure_local_profile(session)
     resume = await service.get_resume(session, profile.id, resume_id)
     return await service.resume_public(session, resume)
+
+
+@router.delete("/resumes/{resume_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_resume(resume_id: uuid.UUID, session: SessionDep) -> Response:
+    profile = await ensure_local_profile(session)
+    resume = await service.get_resume(session, profile.id, resume_id)
+    await service.delete_resume(session, profile.id, resume)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

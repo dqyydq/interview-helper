@@ -53,9 +53,7 @@ def validate_evaluation_references(
     for item in draft.dimensions:
         invalid = {evidence.message_id for evidence in item.evidence} - valid_all
         if invalid:
-            raise EvaluationSemanticError(
-                f"dimension {item.dimension} cites a non-answer message"
-            )
+            raise EvaluationSemanticError(f"dimension {item.dimension} cites a non-answer message")
 
 
 async def run_evaluator(
@@ -98,8 +96,7 @@ async def run_evaluator(
                     ChatMessage(
                         role=MessageRole.USER,
                         content=(
-                            "结果的引用或覆盖范围无效。请仅返回修复后的 JSON。"
-                            f"校验错误：{exc}"
+                            f"结果的引用或覆盖范围无效。请仅返回修复后的 JSON。校验错误：{exc}"
                         ),
                     ),
                 ]

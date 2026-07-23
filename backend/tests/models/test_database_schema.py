@@ -19,9 +19,7 @@ def _unique_names(connection: Connection, table: str) -> set[str]:
         item["name"] for item in inspector.get_unique_constraints(table) if item["name"]
     }
     index_names = {
-        item["name"]
-        for item in inspector.get_indexes(table)
-        if item["name"] and item.get("unique")
+        item["name"] for item in inspector.get_indexes(table) if item["name"] and item.get("unique")
     }
     return constraint_names | index_names
 
@@ -42,7 +40,7 @@ async def test_all_metadata_tables_exist_in_postgresql() -> None:
         )
 
     assert set(SQLModel.metadata.tables) <= database_tables
-    assert len(SQLModel.metadata.tables) == 35
+    assert len(SQLModel.metadata.tables) == 36
 
 
 @pytest.mark.asyncio

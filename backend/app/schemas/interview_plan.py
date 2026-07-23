@@ -32,6 +32,29 @@ class InterviewPlanCreate(ApiModel):
         return self
 
 
+class PlannerQuestionDraft(ApiModel):
+    """A model-selected ordering of a server-provided candidate question.
+
+    The candidate key is deliberately opaque to the provider.  The service resolves it
+    back to the original prompt, source reference and capability tags only after
+    semantic validation succeeds.
+    """
+
+    candidate_key: str = Field(min_length=1, max_length=240)
+    sequence: int = Field(ge=1, le=50)
+    allocated_seconds: int = Field(ge=30, le=7_200)
+    follow_up_budget: int = Field(ge=0, le=10)
+    selection_reason: str = Field(min_length=1, max_length=2_000)
+
+
+class PlannerDraft(ApiModel):
+    """Schema-only planner output; source grounding is checked by the agent."""
+
+    questions: list[PlannerQuestionDraft] = Field(min_length=1, max_length=50)
+    rationale: str = Field(min_length=1, max_length=10_000)
+    capability_coverage: list[str] = Field(default_factory=list, max_length=100)
+
+
 class InterviewConfigPublic(EntityPublic):
     company_id: uuid.UUID
     round_profile_id: uuid.UUID

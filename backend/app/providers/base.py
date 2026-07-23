@@ -1,7 +1,7 @@
 import json
 import math
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Protocol, TypeVar
 
 from pydantic import TypeAdapter, ValidationError
@@ -101,11 +101,17 @@ OutputT = TypeVar("OutputT")
 
 
 class StructuredOutputRunner:
-    def __init__(self, provider: ChatProvider, max_repairs: int = 1) -> None:
+    def __init__(
+        self,
+        provider: ChatProvider,
+        max_repairs: int = 1,
+        request_validator: Callable[[ChatRequest], None] | None = None,
+    ) -> None:
         if max_repairs < 0 or max_repairs > 3:
             raise ValueError("max_repairs must be between 0 and 3")
         self.provider = provider
         self.max_repairs = max_repairs
+        self.request_validator = request_validator
 
     async def run(self, request: ChatRequest, output_type: type[OutputT]) -> OutputT:
         output, _ = await self.run_with_response(request, output_type)
@@ -119,6 +125,8 @@ class StructuredOutputRunner:
         working_request.response_schema = adapter.json_schema()
 
         for attempt in range(self.max_repairs + 1):
+            if self.request_validator:
+                self.request_validator(working_request)
             response = await self.provider.chat(working_request)
             try:
                 payload = json.loads(response.content)

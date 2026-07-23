@@ -1,9 +1,13 @@
+import json
+from collections.abc import AsyncIterator
+from types import SimpleNamespace
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, select
 
-from app.db.models.common import JobStatus, JobType, SegmentStatus
+from app.db.models.common import JobStatus, JobType, ModelRole, SegmentStatus
 from app.db.models.company import Company
 from app.db.models.context import ConversationSegment, InterviewContextState
 from app.db.models.interview import (
@@ -18,9 +22,60 @@ from app.db.models.job import BackgroundJob
 from app.db.models.question import Question, QuestionBank, QuestionTagLink
 from app.db.session import async_session_factory, engine
 from app.main import app
+from app.providers.base import ChatProvider
+from app.providers.types import (
+    ChatRequest,
+    ChatResponse,
+    ProviderHealth,
+    ProviderHealthStatus,
+    StreamEvent,
+)
 from app.realtime.event_store import append_event, find_client_event, replay_events
+from app.services import interview_planning as planning_service
 from app.workers.context_summary_jobs import run_once as run_summary_once
 from app.workers.plan_jobs import run_once as run_plan_once
+
+
+class PlannerProvider(ChatProvider):
+    def __init__(self) -> None:
+        self.requests: list[ChatRequest] = []
+
+    async def chat(self, request: ChatRequest) -> ChatResponse:
+        self.requests.append(request.model_copy(deep=True))
+        payload = json.loads(request.messages[0].content)
+        candidates = payload["candidate_pool"]
+        duration_seconds = payload["contract"]["duration_seconds"]
+        base, remainder = divmod(duration_seconds, len(candidates))
+        questions = [
+            {
+                "candidate_key": candidate["candidate_key"],
+                "sequence": index,
+                "allocated_seconds": base + (1 if index <= remainder else 0),
+                "follow_up_budget": min(1, candidate["max_follow_up_budget"]),
+                "selection_reason": "Bound Planner model arranged this selected candidate.",
+            }
+            for index, candidate in enumerate(reversed(candidates), start=1)
+        ]
+        coverage = sorted({tag for candidate in candidates for tag in candidate["capability_tags"]})
+        return ChatResponse(
+            content=json.dumps(
+                {
+                    "questions": questions,
+                    "rationale": "The bound Planner model ordered the selected candidates.",
+                    "capability_coverage": coverage,
+                }
+            )
+        )
+
+    async def stream_chat(self, request: ChatRequest) -> AsyncIterator[StreamEvent]:
+        if False:
+            yield StreamEvent(type="completed")  # pragma: no cover
+
+    async def health_check(self) -> ProviderHealth:
+        return ProviderHealth(status=ProviderHealthStatus.HEALTHY, latency_ms=1)
+
+    async def aclose(self) -> None:
+        return None
 
 
 async def clear_planning_data() -> None:
@@ -189,6 +244,125 @@ async def test_plan_job_builds_traceable_ready_plan() -> None:
     assert duplicate is not None
     assert duplicate.event_id == first_event.event_id
     assert [event.type for event in replay] == ["assistant.message"]
+
+
+@pytest.mark.asyncio
+async def test_plan_job_uses_the_bound_planner_provider_when_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = PlannerProvider()
+
+    async def resolve_planner(_session, _profile_id, role):
+        assert role is ModelRole.PLANNER
+        return SimpleNamespace(
+            context_window_tokens=32_768,
+            max_output_tokens=2_048,
+            tokenizer_type="estimated",
+        )
+
+    monkeypatch.setattr(planning_service, "resolve_role_connection", resolve_planner)
+    monkeypatch.setattr(planning_service, "build_provider", lambda _: provider)
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        company = (await client.post("/api/companies", json=company_payload())).json()
+        bank = (await client.post("/api/question-banks", json={"name": "Planner model"})).json()
+        for prompt, tags in [
+            ("How would you evaluate an LLM application?", ["evaluation"]),
+            ("How would you design a model gateway?", ["system_design"]),
+        ]:
+            response = await client.post(
+                "/api/questions",
+                json={
+                    "bank_id": bank["id"],
+                    "prompt": prompt,
+                    "status": "active",
+                    "tag_names": tags,
+                },
+            )
+            assert response.status_code == 201
+        created = await client.post(
+            "/api/interview-plans",
+            json={
+                "company_id": company["id"],
+                "round_profile_id": company["latest_style_pack"]["rounds"][0]["id"],
+                "duration_minutes": 45,
+                "target_question_count": 3,
+                "question_bank_ids": [bank["id"]],
+            },
+        )
+        assert created.status_code == 202
+        assert await run_plan_once("bound-planner") is True
+        plan = await client.get(f"/api/interview-plans/{created.json()['plan']['id']}")
+
+    assert plan.status_code == 200
+    payload = plan.json()
+    assert payload["status"] == "ready"
+    assert payload["plan_snapshot"]["planner"] == "model-v1"
+    assert payload["plan_snapshot"]["planner_role"] == "planner"
+    assert payload["rationale"] == "The bound Planner model ordered the selected candidates."
+    assert len(provider.requests) == 1
+    assert sum(item["allocated_seconds"] for item in payload["questions"]) == 45 * 60
+    assert [item["selection_reason"] for item in payload["questions"]] == [
+        "Bound Planner model arranged this selected candidate."
+    ] * 3
+
+
+@pytest.mark.asyncio
+async def test_plan_job_falls_back_without_calling_a_planner_that_cannot_fit_the_pool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = PlannerProvider()
+
+    async def resolve_small_planner(_session, _profile_id, role):
+        assert role is ModelRole.PLANNER
+        return SimpleNamespace(
+            context_window_tokens=1_024,
+            max_output_tokens=256,
+            tokenizer_type="estimated",
+        )
+
+    monkeypatch.setattr(planning_service, "resolve_role_connection", resolve_small_planner)
+    monkeypatch.setattr(planning_service, "build_provider", lambda _: provider)
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        company = (await client.post("/api/companies", json=company_payload())).json()
+        bank = (await client.post("/api/question-banks", json={"name": "Budgeted planner"})).json()
+        question = await client.post(
+            "/api/questions",
+            json={
+                "bank_id": bank["id"],
+                "prompt": "x" * 20_000,
+                "status": "active",
+                "tag_names": ["system_design"],
+            },
+        )
+        assert question.status_code == 201
+        created = await client.post(
+            "/api/interview-plans",
+            json={
+                "company_id": company["id"],
+                "round_profile_id": company["latest_style_pack"]["rounds"][0]["id"],
+                "duration_minutes": 10,
+                "target_question_count": 1,
+                "question_bank_ids": [bank["id"]],
+                "source_weights": {"manual": 1.0, "resume": 0.0, "generated": 0.0},
+            },
+        )
+        assert created.status_code == 202
+        assert await run_plan_once("small-window-planner") is True
+        plan = await client.get(f"/api/interview-plans/{created.json()['plan']['id']}")
+
+    assert plan.status_code == 200
+    assert plan.json()["status"] == "ready"
+    assert plan.json()["plan_snapshot"]["planner"] == "deterministic-v1"
+    assert (
+        plan.json()["plan_snapshot"]["planner_fallback_reason"] == "planner_context_budget_exceeded"
+    )
+    assert provider.requests == []
 
 
 @pytest.mark.asyncio

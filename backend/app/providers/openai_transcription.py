@@ -3,7 +3,11 @@ from typing import Any
 import httpx
 
 from app.providers.base import ProviderError
-from app.providers.http import provider_error_from_response, provider_transport_error
+from app.providers.http import (
+    provider_error_from_response,
+    provider_transport_error,
+    trust_environment_for_provider_url,
+)
 from app.providers.speech_base import (
     SpeechToTextProvider,
     TranscriptionRequest,
@@ -27,7 +31,9 @@ class OpenAICompatibleTranscriptionProvider(SpeechToTextProvider):
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.extra_headers = extra_headers or {}
-        self.client = client or httpx.AsyncClient()
+        self.client = client or httpx.AsyncClient(
+            trust_env=trust_environment_for_provider_url(base_url)
+        )
         self._owns_client = client is None
 
     @property

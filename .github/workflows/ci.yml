@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend, migrations, and tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: interview_helper_test
+          POSTGRES_USER: interview_helper
+          POSTGRES_PASSWORD: local-development-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U interview_helper -d interview_helper_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      INTERVIEW_HELPER_ENVIRONMENT: test
+      INTERVIEW_HELPER_DATABASE_URL: postgresql+asyncpg://interview_helper:local-development-only@localhost:5432/interview_helper_test
+      INTERVIEW_HELPER_TEST_DATABASE_URL: postgresql+asyncpg://interview_helper:local-development-only@localhost:5432/interview_helper_test
+      INTERVIEW_HELPER_ENCRYPTION_SECRET: ci-only-encryption-secret-not-for-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.6"
+      - name: Install locked backend environment
+        working-directory: backend
+        run: |
+          uv sync --extra dev --locked
+      - name: Run lint, migration checks, and tests
+        working-directory: backend
+        run: |
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run alembic upgrade head
+          uv run alembic downgrade -1
+          uv run alembic upgrade head
+          uv run alembic check
+          uv run pytest
+
+  frontend:
+    name: Frontend, build, and browser flow
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Lint, test, and build
+        working-directory: frontend
+        run: |
+          npm run lint -- --max-warnings 0
+          npm test
+          npm run build
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run core mock-provider browser flow
+        working-directory: frontend
+        run: npm run test:e2e
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          if-no-files-found: ignore
+
+  security:
+    name: Dependency and secret scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.6"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Audit production Python dependencies
+        run: |
+          uv export --quiet --project backend --no-dev --no-emit-project --locked --format requirements-txt --output-file /tmp/backend-requirements.txt
+          uvx pip-audit -r /tmp/backend-requirements.txt
+      - name: Audit production frontend dependencies
+        working-directory: frontend
+        run: |
+          npm ci
+          npm audit --omit=dev --audit-level=high
+      - name: Scan for committed secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

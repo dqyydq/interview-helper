@@ -88,9 +88,9 @@ async def get_style_pack(
     profile_id: uuid.UUID | None = None,
 ) -> CompanyStylePack:
     statement = select(CompanyStylePack).where(
-            CompanyStylePack.id == style_pack_id,
-            CompanyStylePack.deleted_at.is_(None),
-        )
+        CompanyStylePack.id == style_pack_id,
+        CompanyStylePack.deleted_at.is_(None),
+    )
     if profile_id is not None:
         statement = statement.join(Company).where(_accessible_company(profile_id))
     style_pack = await session.scalar(statement)
@@ -252,8 +252,7 @@ async def create_style_pack_revision(
         rounds = payload.rounds
     elif current:
         rounds = [
-            RoundProfileCreate.model_validate(item)
-            for item in await _rounds(session, current.id)
+            RoundProfileCreate.model_validate(item) for item in await _rounds(session, current.id)
         ]
     else:
         rounds = []
@@ -308,7 +307,9 @@ async def activate_style_pack(
     style_pack: CompanyStylePack,
 ) -> CompanyStylePack:
     rounds_count = await session.scalar(
-        select(func.count()).select_from(RoundProfile).where(
+        select(func.count())
+        .select_from(RoundProfile)
+        .where(
             RoundProfile.style_pack_id == style_pack.id,
             RoundProfile.deleted_at.is_(None),
         )
@@ -339,14 +340,12 @@ async def get_round(
     profile_id: uuid.UUID | None = None,
 ) -> RoundProfile:
     statement = select(RoundProfile).where(
-            RoundProfile.id == round_id,
-            RoundProfile.deleted_at.is_(None),
-        )
+        RoundProfile.id == round_id,
+        RoundProfile.deleted_at.is_(None),
+    )
     if profile_id is not None:
         statement = (
-            statement.join(CompanyStylePack)
-            .join(Company)
-            .where(_accessible_company(profile_id))
+            statement.join(CompanyStylePack).join(Company).where(_accessible_company(profile_id))
         )
     round_profile = await session.scalar(statement)
     if not round_profile:

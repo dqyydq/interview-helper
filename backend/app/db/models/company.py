@@ -25,9 +25,7 @@ class Company(EntityBase, table=True):
 
 class CompanyStylePack(EntityBase, table=True):
     __tablename__ = "company_style_packs"
-    __table_args__ = (
-        UniqueConstraint("company_id", "pack_version", name="uq_style_pack_version"),
-    )
+    __table_args__ = (UniqueConstraint("company_id", "pack_version", name="uq_style_pack_version"),)
 
     company_id: uuid.UUID = Field(
         foreign_key="companies.id",

@@ -39,6 +39,8 @@ describe("InterviewSocket", () => {
     expect(String(first.url)).toContain("last_sequence=8");
     first.onopen?.();
     expect(socket.send("user.text.submit", { text: "我的回答" })).toBe(true);
+    expect(socket.send("user.answer.commit", { text: "重复回答" })).toBe(false);
+    expect(first.send).toHaveBeenCalledTimes(1);
     const serialized = first.send.mock.calls[0][0] as string;
     const clientEvent = JSON.parse(serialized) as { event_id: string };
 

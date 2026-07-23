@@ -5,6 +5,9 @@ export type QuestionType =
   | "code_discussion"
   | "scenario";
 export type Difficulty = "foundational" | "intermediate" | "advanced" | "expert";
+export type QuestionStatus = "draft" | "active" | "archived";
+export type QuestionSortField = "created_at" | "updated_at" | "difficulty" | "times_used";
+export type SortOrder = "asc" | "desc";
 
 export interface QuestionBank {
   id: string;
@@ -22,13 +25,19 @@ export interface QuestionTag {
   category: string;
 }
 
+export interface QuestionVariant {
+  id: string;
+  prompt: string;
+  variant_type: string;
+}
+
 export interface Question {
   id: string;
   bank_id: string;
   prompt: string;
   question_type: QuestionType;
   difficulty: Difficulty;
-  status: "draft" | "active" | "archived";
+  status: QuestionStatus;
   reference_points: string[];
   follow_up_suggestions: string[];
   applicable_companies: string[];
@@ -38,7 +47,7 @@ export interface Question {
   user_note: string | null;
   times_used: number;
   tags: QuestionTag[];
-  variants: Array<{ id: string; prompt: string; variant_type: string }>;
+  variants: QuestionVariant[];
 }
 
 export interface QuestionPage {
@@ -53,8 +62,41 @@ export interface QuestionDraft {
   prompt: string;
   question_type: QuestionType;
   difficulty: Difficulty;
-  status: "draft" | "active";
+  status: Exclude<QuestionStatus, "archived">;
+  reference_points: string[];
+  follow_up_suggestions: string[];
+  applicable_companies: string[];
+  applicable_rounds: string[];
+  source_note: string | null;
+  user_note: string | null;
   tag_names: string[];
+}
+
+export interface QuestionUpdateDraft {
+  prompt: string;
+  question_type: QuestionType;
+  difficulty: Difficulty;
+  status: QuestionStatus;
+  reference_points: string[];
+  follow_up_suggestions: string[];
+  applicable_companies: string[];
+  applicable_rounds: string[];
+  source_note: string | null;
+  user_note: string | null;
+  tag_names: string[];
+}
+
+export interface QuestionListQuery {
+  bankId?: string;
+  search?: string;
+  status?: QuestionStatus;
+  questionType?: QuestionType;
+  difficulty?: Difficulty;
+  tag?: string;
+  sortBy?: QuestionSortField;
+  sortOrder?: SortOrder;
+  offset?: number;
+  limit?: number;
 }
 
 export interface ResumeSection {

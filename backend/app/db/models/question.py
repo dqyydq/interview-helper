@@ -34,9 +34,7 @@ class QuestionBank(EntityBase, table=True):
 
 class Question(EntityBase, table=True):
     __tablename__ = "questions"
-    __table_args__ = (
-        UniqueConstraint("bank_id", "normalized_hash", name="uq_question_bank_hash"),
-    )
+    __table_args__ = (UniqueConstraint("bank_id", "normalized_hash", name="uq_question_bank_hash"),)
 
     bank_id: uuid.UUID = Field(
         foreign_key="question_banks.id",
@@ -93,9 +91,7 @@ class QuestionTag(EntityBase, table=True):
 
 class QuestionTagLink(EntityBase, table=True):
     __tablename__ = "question_tag_links"
-    __table_args__ = (
-        UniqueConstraint("question_id", "tag_id", name="uq_question_tag_link"),
-    )
+    __table_args__ = (UniqueConstraint("question_id", "tag_id", name="uq_question_tag_link"),)
 
     question_id: uuid.UUID = Field(
         foreign_key="questions.id",

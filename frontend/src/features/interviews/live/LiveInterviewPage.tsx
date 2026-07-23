@@ -73,14 +73,16 @@ export function LiveInterviewPage() {
     return () => socket.close();
   }, [session.data, sessionId]);
 
+  const timerIsActive = status === "interviewing" && remainingSeconds > 0;
+
   useEffect(() => {
-    if (status !== "interviewing" || remainingSeconds <= 0) return;
+    if (!timerIsActive) return;
     const timer = window.setInterval(
       () => setRemainingSeconds((current) => Math.max(0, current - 1)),
       1_000,
     );
     return () => window.clearInterval(timer);
-  }, [status, remainingSeconds <= 0]);
+  }, [timerIsActive]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();

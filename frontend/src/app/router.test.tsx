@@ -58,12 +58,54 @@ vi.mock("../features/reports/api", () => ({
   },
 }));
 
+vi.mock("../features/diagnostics/api", () => ({
+  diagnosticsApi: {
+    get: vi.fn().mockResolvedValue({
+      generated_at: "2026-07-19T10:00:00Z",
+      application: { name: "Interview Helper", version: "0.1.0", environment: "test" },
+      database: { status: "connected" },
+      worker: {
+        state: "not_running",
+        active_workers: 0,
+        stale_workers: 0,
+        recent_worker_errors: 0,
+        last_heartbeat_at: null,
+        last_job_type: null,
+        last_error_type: null,
+        last_error_at: null,
+        job_counts: {},
+        stale_running_jobs: 0,
+        recent_failed_jobs: 0,
+        heartbeat_stale_after_seconds: 30,
+      },
+      models: {
+        connection_count: 0,
+        binding_count: 0,
+        status_counts: {},
+        required_ready: false,
+        missing_required_roles: ["interviewer", "evaluator"],
+        degraded_required_roles: [],
+        transcriber_configured: false,
+      },
+      files: { configured: true, exists: false, writable: false, file_count: 0, total_bytes: 0 },
+      privacy: {
+        redaction_applied: true,
+        contains_secrets: false,
+        contains_answer_content: false,
+        contains_local_paths: false,
+      },
+    }),
+    bundle: vi.fn(),
+  },
+}));
+
 const routes = [
   ["/interviews", "选择公司"],
   ["/questions", "面试知识库"],
   ["/reports", "面试评估报告"],
   ["/settings", "系统设置"],
   ["/settings/memory", "长期记忆"],
+  ["/settings/diagnostics", "系统诊断"],
 ] as const;
 
 describe("application routes", () => {

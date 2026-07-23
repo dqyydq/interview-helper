@@ -35,9 +35,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("session_id", "sequence", name="uq_realtime_event_sequence"),
         sa.UniqueConstraint("session_id", "event_id", name="uq_realtime_event_id"),
-        sa.UniqueConstraint(
-            "session_id", "client_event_id", name="uq_realtime_client_event_id"
-        ),
+        sa.UniqueConstraint("session_id", "client_event_id", name="uq_realtime_client_event_id"),
     )
     op.create_index(
         op.f("ix_interview_realtime_events_session_id"),

@@ -32,9 +32,7 @@ class Resume(EntityBase, table=True):
 
 class ResumeSection(EntityBase, table=True):
     __tablename__ = "resume_sections"
-    __table_args__ = (
-        UniqueConstraint("resume_id", "sequence", name="uq_resume_section_sequence"),
-    )
+    __table_args__ = (UniqueConstraint("resume_id", "sequence", name="uq_resume_section_sequence"),)
 
     resume_id: uuid.UUID = Field(
         foreign_key="resumes.id",

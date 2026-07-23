@@ -71,8 +71,7 @@ async def save_user_answer(
         existing = await session.scalar(
             select(InterviewMessage).where(
                 InterviewMessage.session_id == interview.id,
-                InterviewMessage.message_metadata["client_event_id"].as_string()
-                == client_event_id,
+                InterviewMessage.message_metadata["client_event_id"].as_string() == client_event_id,
                 InterviewMessage.deleted_at.is_(None),
             )
         )

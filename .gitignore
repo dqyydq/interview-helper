@@ -71,3 +71,5 @@ test-results/
 playwright-report/
 blob-report/
 screenshots/
+!frontend/e2e/screenshots/
+!frontend/e2e/screenshots/*.png

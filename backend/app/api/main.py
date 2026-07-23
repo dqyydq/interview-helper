@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     companies,
     context_diagnostics,
+    diagnostics,
     health,
     interview_plans,
     interview_sessions,
@@ -27,4 +28,5 @@ api_router.include_router(transcriptions.router)
 api_router.include_router(interview_plans.router)
 api_router.include_router(interview_sessions.router)
 api_router.include_router(context_diagnostics.router)
+api_router.include_router(diagnostics.router)
 api_router.include_router(memories.router)

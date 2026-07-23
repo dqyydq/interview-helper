@@ -115,9 +115,7 @@ async def test_company_round_evidence_and_revision_lifecycle() -> None:
         assert duplicate_sequence.status_code == 409
         assert duplicate_sequence.json()["code"] == "database_conflict"
 
-        activated_revision = await client.post(
-            f"/api/style-packs/{revision_data['id']}/activate"
-        )
+        activated_revision = await client.post(f"/api/style-packs/{revision_data['id']}/activate")
         assert activated_revision.status_code == 200
         assert activated_revision.json()["status"] == "active"
 

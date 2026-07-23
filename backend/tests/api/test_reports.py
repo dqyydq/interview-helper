@@ -222,9 +222,7 @@ def _response(questions, answers) -> dict:
                 "plan_question_id": str(question.id),
                 "anchor": "solid",
                 "summary": "回答覆盖架构与降级。",
-                "evidence": [
-                    {"message_id": str(answer.id), "claim": "说明了架构和降级策略"}
-                ],
+                "evidence": [{"message_id": str(answer.id), "claim": "说明了架构和降级策略"}],
                 "gaps": ["缺少量化"],
                 "actions": ["增加 QPS 估算"],
                 "confidence": 0.82,
@@ -235,9 +233,7 @@ def _response(questions, answers) -> dict:
             {
                 "dimension": dimension,
                 "anchor": "solid",
-                "evidence": [
-                    {"message_id": str(answers[0].id), "claim": "解释了核心取舍"}
-                ],
+                "evidence": [{"message_id": str(answers[0].id), "claim": "解释了核心取舍"}],
                 "gaps": ["量化不足"],
                 "action": "补充可验证的数量级和边界。",
                 "confidence": 0.76,
@@ -278,7 +274,8 @@ async def test_evaluation_persists_only_raw_answer_evidence_and_report_api(
     assert request_payload["contract"]["style_pack_version"] == 3
     assert len(request_payload["interview_messages"]) == 4
     answer_payload = next(
-        item for item in request_payload["interview_messages"]
+        item
+        for item in request_payload["interview_messages"]
         if item["message_id"] == str(answers[0].id)
     )
     assert answer_payload["attachments"][0]["content"] == "def solve():\n    return 42"
@@ -291,9 +288,7 @@ async def test_evaluation_persists_only_raw_answer_evidence_and_report_api(
     assert body["trend_comparison"] == {}
     assert len(body["questions"]) == 2
     assert len(body["dimensions"]) == 4
-    assert {item["id"] for item in body["evidence_messages"]} == {
-        str(item.id) for item in answers
-    }
+    assert {item["id"] for item in body["evidence_messages"]} == {str(item.id) for item in answers}
     evidence_answer = next(
         item for item in body["evidence_messages"] if item["id"] == str(answers[0].id)
     )

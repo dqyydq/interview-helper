@@ -31,9 +31,7 @@ async def run_coach(
         temperature=0.2,
         max_tokens=2_048,
     )
-    result = await StructuredOutputRunner(provider, max_repairs=1).run(
-        request, CoachResponse
-    )
+    result = await StructuredOutputRunner(provider, max_repairs=1).run(request, CoachResponse)
     if result.mode != mode:
         raise ValueError("coach response mode does not match the request")
     if set(result.source_message_ids) - allowed_message_ids:

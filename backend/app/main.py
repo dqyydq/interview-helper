@@ -7,9 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_error_handlers
 from app.api.main import api_router
-from app.api.middleware import RequestIdMiddleware
+from app.api.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
 from app.api.routes.interview_live import router as interview_live_router
 from app.core.config import settings
+from app.core.logging import configure_logging
 from app.db.session import dispose_engine
 
 
@@ -30,6 +31,7 @@ def frontend_origins() -> list[str]:
 
 
 def create_app() -> FastAPI:
+    configure_logging()
     application = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
@@ -44,6 +46,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.add_middleware(RequestIdMiddleware)
+    application.add_middleware(SecurityHeadersMiddleware)
     application.include_router(api_router, prefix=settings.api_prefix)
     application.include_router(interview_live_router, prefix=settings.api_prefix)
     register_error_handlers(application)

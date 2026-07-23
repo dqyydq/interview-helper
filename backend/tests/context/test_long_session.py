@@ -319,8 +319,7 @@ async def test_sixty_minute_small_context_triggers_repeated_auditable_compaction
     assert all(item.compaction_level >= 2 for item in snapshots)
     assert all(item.token_by_layer["tokens_removed"] > 0 for item in snapshots)
     assert all(
-        item.input_tokens <= item.token_by_layer["effective_input_budget"]
-        for item in snapshots
+        item.input_tokens <= item.token_by_layer["effective_input_budget"] for item in snapshots
     )
     assert all(0 < item.token_by_layer["compression_ratio"] < 1 for item in snapshots)
 
@@ -429,9 +428,7 @@ async def test_summary_failure_preserves_raw_transcript_for_future_evidence(
         async def resolve_connection(*args, **kwargs) -> ModelConnection:
             return connection
 
-        monkeypatch.setattr(
-            "app.context.summarizer.resolve_role_connection", resolve_connection
-        )
+        monkeypatch.setattr("app.context.summarizer.resolve_role_connection", resolve_connection)
         monkeypatch.setattr(
             "app.context.summarizer.build_provider",
             lambda configured: InvalidSummaryProvider(),
@@ -488,8 +485,7 @@ async def test_finish_is_idempotent_and_enqueues_one_evaluation_job() -> None:
         evaluation_jobs = await session.scalar(
             select(func.count(BackgroundJob.id)).where(
                 BackgroundJob.job_type == JobType.INTERVIEW_EVALUATION,
-                BackgroundJob.idempotency_key
-                == f"interview-evaluation:{interview.id}:v1",
+                BackgroundJob.idempotency_key == f"interview-evaluation:{interview.id}:v1",
             )
         )
 

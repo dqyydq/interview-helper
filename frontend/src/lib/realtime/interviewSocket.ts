@@ -82,6 +82,12 @@ export class InterviewSocket {
 
   send(type: ClientEventType, payload: Record<string, unknown> = {}) {
     if (this.socket?.readyState !== WebSocket.OPEN) return false;
+    if (
+      (type === "user.text.submit" || type === "user.answer.commit")
+      && this.pendingAnswer
+    ) {
+      return false;
+    }
     this.clientSequence += 1;
     const event: ClientEvent = {
       event_id: crypto.randomUUID(),

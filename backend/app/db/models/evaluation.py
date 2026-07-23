@@ -67,9 +67,7 @@ class QuestionEvaluation(EntityBase, table=True):
 
 class DimensionEvaluation(EntityBase, table=True):
     __tablename__ = "dimension_evaluations"
-    __table_args__ = (
-        UniqueConstraint("report_id", "dimension", name="uq_dimension_evaluation"),
-    )
+    __table_args__ = (UniqueConstraint("report_id", "dimension", name="uq_dimension_evaluation"),)
 
     report_id: uuid.UUID = Field(
         foreign_key="evaluation_reports.id",

@@ -299,18 +299,22 @@ async def evaluate_interview(
     dimensions = _expected_dimensions(round_profile)
     question_ids = _question_message_ids(questions, messages)
     message_ids = [message.id for message in messages]
-    attachments = list(
-        (
-            await session.scalars(
-                select(AnswerAttachment)
-                .where(
-                    AnswerAttachment.message_id.in_(message_ids),
-                    AnswerAttachment.deleted_at.is_(None),
+    attachments = (
+        list(
+            (
+                await session.scalars(
+                    select(AnswerAttachment)
+                    .where(
+                        AnswerAttachment.message_id.in_(message_ids),
+                        AnswerAttachment.deleted_at.is_(None),
+                    )
+                    .order_by(AnswerAttachment.created_at)
                 )
-                .order_by(AnswerAttachment.created_at)
-            )
-        ).all()
-    ) if message_ids else []
+            ).all()
+        )
+        if message_ids
+        else []
+    )
     attachments_by_message: dict[uuid.UUID, list[AnswerAttachment]] = {}
     for attachment in attachments:
         attachments_by_message.setdefault(attachment.message_id, []).append(attachment)
@@ -468,30 +472,38 @@ async def report_public(
         for entry in item.evidence
         if entry.get("message_id")
     }
-    evidence_messages = list(
-        (
-            await session.scalars(
-                select(InterviewMessage)
-                .where(
-                    InterviewMessage.id.in_(evidence_ids),
-                    InterviewMessage.session_id == report.session_id,
+    evidence_messages = (
+        list(
+            (
+                await session.scalars(
+                    select(InterviewMessage)
+                    .where(
+                        InterviewMessage.id.in_(evidence_ids),
+                        InterviewMessage.session_id == report.session_id,
+                    )
+                    .order_by(InterviewMessage.sequence)
                 )
-                .order_by(InterviewMessage.sequence)
-            )
-        ).all()
-    ) if evidence_ids else []
-    evidence_attachments = list(
-        (
-            await session.scalars(
-                select(AnswerAttachment)
-                .where(
-                    AnswerAttachment.message_id.in_(evidence_ids),
-                    AnswerAttachment.deleted_at.is_(None),
+            ).all()
+        )
+        if evidence_ids
+        else []
+    )
+    evidence_attachments = (
+        list(
+            (
+                await session.scalars(
+                    select(AnswerAttachment)
+                    .where(
+                        AnswerAttachment.message_id.in_(evidence_ids),
+                        AnswerAttachment.deleted_at.is_(None),
+                    )
+                    .order_by(AnswerAttachment.created_at)
                 )
-                .order_by(AnswerAttachment.created_at)
-            )
-        ).all()
-    ) if evidence_ids else []
+            ).all()
+        )
+        if evidence_ids
+        else []
+    )
     evidence_attachments_by_message: dict[uuid.UUID, list[AnswerAttachment]] = {}
     for attachment in evidence_attachments:
         evidence_attachments_by_message.setdefault(attachment.message_id, []).append(attachment)

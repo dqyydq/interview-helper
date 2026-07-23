@@ -107,9 +107,7 @@ async def update_memory_settings(
     payload: MemorySettingsUpdate, session: SessionDep
 ) -> MemorySettingsPublic:
     profile = await ensure_local_profile(session)
-    return await service.update_settings(
-        session, profile, memory_enabled=payload.memory_enabled
-    )
+    return await service.update_settings(session, profile, memory_enabled=payload.memory_enabled)
 
 
 @router.get("/interview-plans/{plan_id}/memory-preview", response_model=MemoryPreviewPublic)

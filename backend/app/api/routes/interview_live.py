@@ -8,7 +8,9 @@ from pydantic import ValidationError
 
 from app.api.errors import AppError
 from app.context.snapshot import finalize_context_snapshot
-from app.db.models.common import SessionStatus, utc_now
+from app.core.config import settings
+from app.core.security import InFlightAnswerRegistry, SlidingWindowRateLimiter
+from app.db.models.common import MessageRole, SessionStatus, utc_now
 from app.db.models.interview import InterviewPlan, InterviewSession
 from app.db.session import async_session_factory
 from app.providers.types import StreamEventType, Usage
@@ -30,6 +32,24 @@ MAX_MESSAGE_BYTES = 64 * 1024
 MAX_INVALID_EVENTS = 3
 IDLE_TIMEOUT_SECONDS = 15 * 60
 PROVIDER_STREAM_TIMEOUT_SECONDS = 60
+connection_rate_limiter = SlidingWindowRateLimiter(
+    max_events=settings.websocket_connections_per_minute,
+    window_seconds=60,
+    max_keys=settings.websocket_rate_limiter_max_keys,
+)
+in_flight_answers = InFlightAnswerRegistry()
+
+
+def _status_value(value: SessionStatus | str) -> str:
+    """Normalize SQLAlchemy String-backed enum fields for realtime payloads."""
+
+    return SessionStatus(value).value
+
+
+def _message_role_value(value: MessageRole | str) -> str:
+    """Normalize SQLAlchemy String-backed role fields for realtime payloads."""
+
+    return MessageRole(value).value
 
 
 async def _send(websocket: WebSocket, event: ServerEvent) -> None:
@@ -102,6 +122,12 @@ async def _send_timer(
 
 @router.websocket("/interviews/{session_id}/live")
 async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
+    client_host = websocket.client.host if websocket.client else "unknown"
+    # Limit by the remote peer, not by session ID.  A client can otherwise mint
+    # arbitrary IDs to bypass the connection-frequency window before database lookup.
+    if not connection_rate_limiter.allow(client_host):
+        await websocket.close(code=1013, reason="connection rate limit")
+        return
     if not await connection_manager.connect(session_id, websocket):
         return
     invalid_events = 0
@@ -119,15 +145,13 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                     session,
                     interview,
                     event_type="session.state",
-                    payload={"status": interview.status.value},
+                    payload={"status": _status_value(interview.status)},
                 ),
             )
             await _send_timer(websocket, session, interview)
         while True:
             try:
-                raw = await asyncio.wait_for(
-                    websocket.receive_text(), timeout=IDLE_TIMEOUT_SECONDS
-                )
+                raw = await asyncio.wait_for(websocket.receive_text(), timeout=IDLE_TIMEOUT_SECONDS)
             except TimeoutError:
                 await websocket.close(code=1001, reason="session idle timeout")
                 return
@@ -180,7 +204,7 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                             session,
                             interview,
                             event_type="session.state",
-                            payload={"status": interview.status.value},
+                            payload={"status": _status_value(interview.status)},
                             client_event_id=str(incoming.event_id),
                         ),
                     )
@@ -214,7 +238,7 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                             payload={
                                 "message": {
                                     "id": str(message.id),
-                                    "role": message.role.value,
+                                    "role": _message_role_value(message.role),
                                     "content": message.content,
                                     "sequence": message.sequence,
                                 }
@@ -229,7 +253,7 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                         session,
                         interview,
                         event_type="session.state",
-                        payload={"status": interview.status.value},
+                        payload={"status": _status_value(interview.status)},
                         client_event_id=str(incoming.event_id),
                     )
                     await _send(websocket, event)
@@ -241,7 +265,7 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                         session,
                         interview,
                         event_type="session.state",
-                        payload={"status": interview.status.value},
+                        payload={"status": _status_value(interview.status)},
                         client_event_id=str(incoming.event_id),
                     )
                     await _send(websocket, event)
@@ -260,29 +284,41 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                         "回答或代码附件格式不符合要求",
                     )
                     continue
-                answer = await save_user_answer(
-                    session,
-                    interview,
-                    answer_payload.text,
-                    client_event_id=str(incoming.event_id),
-                    attachments=answer_payload.attachments,
-                )
-                ack = await append_event(
-                    session,
-                    interview,
-                    event_type="input.ack",
-                    payload={
-                        "client_event_id": str(incoming.event_id),
-                        "message": {
-                            "id": str(answer.id),
-                            "role": answer.role.value,
-                            "content": answer.content,
-                            "sequence": answer.sequence,
+                if not await in_flight_answers.acquire(session_id):
+                    await _send_protocol_error(
+                        websocket,
+                        session_id,
+                        "answer_pending",
+                        "上一条回答尚未确认，请等待确认后再提交",
+                    )
+                    continue
+                try:
+                    answer = await save_user_answer(
+                        session,
+                        interview,
+                        answer_payload.text,
+                        client_event_id=str(incoming.event_id),
+                        attachments=answer_payload.attachments,
+                    )
+                    ack = await append_event(
+                        session,
+                        interview,
+                        event_type="input.ack",
+                        payload={
+                            "client_event_id": str(incoming.event_id),
+                            "message": {
+                                "id": str(answer.id),
+                                "role": _message_role_value(answer.role),
+                                "content": answer.content,
+                                "sequence": answer.sequence,
+                            },
                         },
-                    },
-                    client_event_id=str(incoming.event_id),
-                )
-                await _send(websocket, ack)
+                        client_event_id=str(incoming.event_id),
+                    )
+                    await _send(websocket, ack)
+                except BaseException:
+                    await in_flight_answers.release(session_id)
+                    raise
                 try:
                     turn = await prepare_turn(session, interview)
                     content = ""
@@ -296,10 +332,7 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                             try:
                                 async with asyncio.timeout(PROVIDER_STREAM_TIMEOUT_SECONDS):
                                     async for chunk in turn.provider.stream_chat(turn.request):
-                                        if (
-                                            chunk.type == StreamEventType.TEXT_DELTA
-                                            and chunk.text
-                                        ):
+                                        if chunk.type == StreamEventType.TEXT_DELTA and chunk.text:
                                             content += chunk.text
                                             await _transient(websocket, session_id, chunk.text)
                                         elif chunk.type == StreamEventType.USAGE and chunk.usage:
@@ -341,7 +374,7 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                         payload={
                             "message": {
                                 "id": str(message.id),
-                                "role": message.role.value,
+                                "role": _message_role_value(message.role),
                                 "content": message.content,
                                 "sequence": message.sequence,
                             }
@@ -357,7 +390,7 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                                 session,
                                 interview,
                                 event_type="session.state",
-                                payload={"status": interview.status.value},
+                                payload={"status": _status_value(interview.status)},
                             ),
                         )
                 except AppError as exc:
@@ -372,6 +405,9 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                         },
                     )
                     await _send(websocket, error)
+                finally:
+                    # Keep the admission lock until the assistant turn is persisted or failed.
+                    await in_flight_answers.release(session_id)
     except WebSocketDisconnect:
         return
     except (AppError, ValueError):

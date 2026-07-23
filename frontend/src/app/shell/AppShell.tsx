@@ -2,6 +2,8 @@ import { BookOpen, FileBarChart, Github, MessagesSquare, Settings } from "lucide
 import type { PropsWithChildren } from "react";
 import { NavLink } from "react-router-dom";
 
+import { CommandPalette } from "./CommandPalette";
+
 const navigation = [
   { to: "/interviews", label: "模拟面试", icon: MessagesSquare },
   { to: "/questions", label: "面试知识库", icon: BookOpen },
@@ -22,6 +24,8 @@ export function AppShell({ children }: PropsWithChildren) {
             <small>开源 · AI 模拟面试</small>
           </span>
         </NavLink>
+
+        <CommandPalette />
 
         <nav className="primary-nav" aria-label="主导航">
           {navigation.map(({ to, label, icon: Icon }) => (

@@ -161,25 +161,18 @@ async def context_diagnostics(
         current_state=current_state,
         summary={
             "snapshot_count": len(snapshots),
-            "max_compaction_level": max(
-                (item.compaction_level for item in snapshots), default=0
-            ),
+            "max_compaction_level": max((item.compaction_level for item in snapshots), default=0),
             "total_input_tokens": sum(item.input_tokens for item in snapshots),
             "average_compression_ratio": round(
-                sum(
-                    float(item.token_by_layer.get("compression_ratio", 1.0))
-                    for item in snapshots
-                )
+                sum(float(item.token_by_layer.get("compression_ratio", 1.0)) for item in snapshots)
                 / max(len(snapshots), 1),
                 4,
             ),
             "retrieval_candidate_count": sum(
-                int(item.token_by_layer.get("retrieval_candidate_count", 0))
-                for item in snapshots
+                int(item.token_by_layer.get("retrieval_candidate_count", 0)) for item in snapshots
             ),
             "retrieval_included_count": sum(
-                int(item.token_by_layer.get("retrieval_included_count", 0))
-                for item in snapshots
+                int(item.token_by_layer.get("retrieval_included_count", 0)) for item in snapshots
             ),
         },
         snapshots=[ContextSnapshotPublic.model_validate(item) for item in snapshots],

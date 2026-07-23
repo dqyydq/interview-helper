@@ -72,9 +72,7 @@ class InterviewPlan(EntityBase, table=True):
 
 class PlanQuestion(EntityBase, table=True):
     __tablename__ = "plan_questions"
-    __table_args__ = (
-        UniqueConstraint("plan_id", "sequence", name="uq_plan_question_sequence"),
-    )
+    __table_args__ = (UniqueConstraint("plan_id", "sequence", name="uq_plan_question_sequence"),)
 
     plan_id: uuid.UUID = Field(
         foreign_key="interview_plans.id",

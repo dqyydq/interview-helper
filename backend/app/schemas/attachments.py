@@ -1,13 +1,14 @@
 import uuid
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.db.models.common import AttachmentType
 from app.schemas.common import ApiModel, EntityPublic
 
 MAX_CODE_ATTACHMENT_BYTES = 32 * 1024
 MAX_CODE_ATTACHMENTS_PER_ANSWER = 3
+MAX_ANSWER_PAYLOAD_BYTES = 56 * 1024
 
 
 class CodeAttachmentInput(ApiModel):
@@ -30,6 +31,15 @@ class AnswerCommitPayload(ApiModel):
         default_factory=list,
         max_length=MAX_CODE_ATTACHMENTS_PER_ANSWER,
     )
+
+    @model_validator(mode="after")
+    def validate_total_payload_size(self) -> "AnswerCommitPayload":
+        size = len(self.text.encode("utf-8")) + sum(
+            len(item.content.encode("utf-8")) for item in self.attachments
+        )
+        if size > MAX_ANSWER_PAYLOAD_BYTES:
+            raise ValueError("回答和附件合计不能超过 56 KB")
+        return self
 
 
 class AnswerAttachmentPublic(EntityPublic):

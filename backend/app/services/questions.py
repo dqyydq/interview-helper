@@ -69,7 +69,9 @@ async def get_bank(
 
 async def bank_public(session: AsyncSession, bank: QuestionBank) -> QuestionBankPublic:
     question_count = await session.scalar(
-        select(func.count()).select_from(Question).where(
+        select(func.count())
+        .select_from(Question)
+        .where(
             Question.bank_id == bank.id,
             Question.status != QuestionStatus.ARCHIVED,
             Question.deleted_at.is_(None),
@@ -252,9 +254,7 @@ async def _replace_tags(
             session.add(tag)
             await session.flush()
         tag_ids.add(tag.id)
-    session.add_all(
-        [QuestionTagLink(question_id=question_id, tag_id=tag_id) for tag_id in tag_ids]
-    )
+    session.add_all([QuestionTagLink(question_id=question_id, tag_id=tag_id) for tag_id in tag_ids])
 
 
 async def create_question(

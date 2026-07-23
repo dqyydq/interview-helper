@@ -50,3 +50,25 @@ export interface CompanyDraft {
     duration_minutes: number;
   }>;
 }
+
+export interface CompanyUpdateDraft {
+  name?: string;
+  description?: string;
+}
+
+export interface RoundDraft {
+  round_key: string;
+  name: string;
+  sequence: number;
+  opening_style?: string | null;
+  topic_weights?: Record<string, number>;
+  follow_up_patterns?: string[];
+  pressure_level?: number;
+  answer_expectations?: string[];
+  evaluation_weights?: Record<string, number>;
+  duration_minutes?: number;
+}
+
+export type RoundUpdateDraft = Partial<Omit<RoundDraft, "sequence">> & {
+  sequence?: number;
+};

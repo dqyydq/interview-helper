@@ -14,9 +14,7 @@ from app.db.models.common import (
 
 class ModelConnection(EntityBase, table=True):
     __tablename__ = "model_connections"
-    __table_args__ = (
-        UniqueConstraint("profile_id", "name", name="uq_model_connection_name"),
-    )
+    __table_args__ = (UniqueConstraint("profile_id", "name", name="uq_model_connection_name"),)
 
     profile_id: uuid.UUID = Field(
         foreign_key="user_profiles.id",
@@ -42,9 +40,7 @@ class ModelConnection(EntityBase, table=True):
 
 class ModelRoleBinding(EntityBase, table=True):
     __tablename__ = "model_role_bindings"
-    __table_args__ = (
-        UniqueConstraint("profile_id", "role", name="uq_model_role_binding"),
-    )
+    __table_args__ = (UniqueConstraint("profile_id", "role", name="uq_model_role_binding"),)
 
     profile_id: uuid.UUID = Field(
         foreign_key="user_profiles.id",

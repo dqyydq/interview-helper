@@ -55,16 +55,12 @@ async def test_memory_api_controls_lifecycle_and_global_switch() -> None:
     ) as client:
         listed = await client.get("/api/memories", params={"status": "proposed"})
         confirmed = await client.post(f"/api/memories/{proposed.id}/confirm")
-        pinned = await client.patch(
-            f"/api/memories/{proposed.id}/pin", json={"pinned": True}
-        )
+        pinned = await client.patch(f"/api/memories/{proposed.id}/pin", json={"pinned": True})
         edited = await client.patch(
             f"/api/memories/{proposed.id}",
             json={"content": "上下文工程与证据追踪能力稳定"},
         )
-        disabled = await client.patch(
-            "/api/memory-settings", json={"memory_enabled": False}
-        )
+        disabled = await client.patch("/api/memory-settings", json={"memory_enabled": False})
         rejected = await client.post(f"/api/memories/{proposed.id}/reject")
 
     assert listed.status_code == 200
@@ -85,9 +81,7 @@ async def test_memory_api_delete_and_not_found_are_scoped() -> None:
         base_url="http://test",
     ) as client:
         await client.get("/api/memory-settings")
-        missing = await client.patch(
-            f"/api/memories/{uuid.uuid4()}", json={"content": "不存在"}
-        )
+        missing = await client.patch(f"/api/memories/{uuid.uuid4()}", json={"content": "不存在"})
 
     assert missing.status_code == 404
     assert missing.json()["code"] == "memory_not_found"

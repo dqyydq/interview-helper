@@ -54,9 +54,5 @@ def activation_status(
     if explicit_user_statement and memory_type in EXPLICIT_ACTIVE_TYPES:
         return MemoryStatus.ACTIVE
     if memory_type in {MemoryType.STABLE_SKILL, MemoryType.RECURRING_GAP}:
-        return (
-            MemoryStatus.ACTIVE
-            if independent_session_count >= 2
-            else MemoryStatus.PROPOSED
-        )
+        return MemoryStatus.ACTIVE if independent_session_count >= 2 else MemoryStatus.PROPOSED
     return MemoryStatus.PROPOSED

@@ -68,12 +68,7 @@ async def resolve_conflict(
         )
     winner = await session.get(MemoryItem, winning_memory_id)
     loser = await session.get(MemoryItem, (candidate_ids - {winning_memory_id}).pop())
-    if (
-        not winner
-        or not loser
-        or winner.profile_id != profile_id
-        or loser.profile_id != profile_id
-    ):
+    if not winner or not loser or winner.profile_id != profile_id or loser.profile_id != profile_id:
         raise AppError(code="memory_not_found", message="冲突记忆不存在", status_code=404)
     now = utc_now()
     winner.status = MemoryStatus.ACTIVE

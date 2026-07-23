@@ -7,7 +7,12 @@ import httpx
 
 from app.db.models.common import MessageRole
 from app.providers.base import ChatProvider
-from app.providers.http import elapsed_ms, provider_error_from_response, provider_transport_error
+from app.providers.http import (
+    elapsed_ms,
+    provider_error_from_response,
+    provider_transport_error,
+    trust_environment_for_provider_url,
+)
 from app.providers.types import (
     ChatMessage,
     ChatRequest,
@@ -37,7 +42,9 @@ class OpenAICompatibleProvider(ChatProvider):
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.extra_headers = extra_headers or {}
-        self.client = client or httpx.AsyncClient()
+        self.client = client or httpx.AsyncClient(
+            trust_env=trust_environment_for_provider_url(base_url)
+        )
         self._owns_client = client is None
 
     @property

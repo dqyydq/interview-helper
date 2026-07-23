@@ -17,6 +17,13 @@ def test_code_attachment_enforces_utf8_byte_limit_and_attachment_count() -> None
     with pytest.raises(ValidationError):
         AnswerCommitPayload(text="answer", attachments=[attachment] * 4)
 
+    large_attachment = CodeAttachmentInput(language="text", content="a" * 31_000)
+    with pytest.raises(ValidationError):
+        AnswerCommitPayload(
+            text="b" * 27_000,
+            attachments=[large_attachment],
+        )
+
 
 def test_code_attachment_is_rendered_as_non_executable_context_data() -> None:
     message = InterviewMessage(
