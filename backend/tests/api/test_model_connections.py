@@ -5,9 +5,10 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, select
 
+from app.api.errors import AppError
 from app.core.config import settings
 from app.core.crypto import SecretCipher
-from app.db.models.common import ModelRole
+from app.db.models.common import ConnectionStatus, ModelRole
 from app.db.models.model_connection import ModelConnection, ModelRoleBinding
 from app.db.models.profile import UserProfile
 from app.db.session import async_session_factory, engine
@@ -152,6 +153,57 @@ async def test_context_summarizer_falls_back_to_planner_binding() -> None:
         )
 
     assert resolved.id == connection.id
+
+
+@pytest.mark.asyncio
+async def test_explicit_researcher_role_does_not_fall_back_to_interviewer_binding() -> None:
+    async with async_session_factory() as session:
+        profile = await service.ensure_local_profile(session)
+        connection = await service.create_connection(
+            session,
+            profile.id,
+            ModelConnectionCreate.model_validate(connection_payload("interviewer")),
+        )
+        await service.bind_role(session, profile.id, ModelRole.INTERVIEWER, connection)
+
+        fallback_connection = await service.resolve_role_connection(
+            session,
+            profile.id,
+            ModelRole.RESEARCHER,
+        )
+        with pytest.raises(AppError) as error:
+            await service.resolve_explicit_role_connection(
+                session,
+                profile.id,
+                ModelRole.RESEARCHER,
+            )
+
+    assert fallback_connection.id == connection.id
+    assert error.value.code == "model_role_unbound"
+    assert error.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_explicit_researcher_role_resolves_its_enabled_connection() -> None:
+    async with async_session_factory() as session:
+        profile = await service.ensure_local_profile(session)
+        connection = await service.create_connection(
+            session,
+            profile.id,
+            ModelConnectionCreate.model_validate(connection_payload("researcher")),
+        )
+        connection.status = ConnectionStatus.HEALTHY
+        await session.commit()
+        await service.bind_role(session, profile.id, ModelRole.RESEARCHER, connection)
+
+        resolved = await service.resolve_explicit_role_connection(
+            session,
+            profile.id,
+            ModelRole.RESEARCHER,
+        )
+
+    assert resolved.id == connection.id
+    assert resolved.status is ConnectionStatus.HEALTHY
 
 
 @pytest.mark.asyncio

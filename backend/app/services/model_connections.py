@@ -276,3 +276,36 @@ async def resolve_role_connection(
         message=f"尚未为 {role.value} 配置可用模型",
         status_code=409,
     )
+
+
+async def resolve_explicit_role_connection(
+    session: AsyncSession,
+    profile_id: uuid.UUID,
+    role: ModelRole,
+) -> ModelConnection:
+    """Resolve only the connection explicitly bound to ``role`` for a profile.
+
+    This deliberately differs from :func:`resolve_role_connection`: callers with
+    data-isolation requirements, such as external-source research, must opt into
+    the exact configured model role and never inherit a more general fallback.
+    """
+
+    connection = await session.scalar(
+        select(ModelConnection)
+        .join(ModelRoleBinding, ModelRoleBinding.connection_id == ModelConnection.id)
+        .where(
+            ModelRoleBinding.profile_id == profile_id,
+            ModelRoleBinding.role == role,
+            ModelRoleBinding.deleted_at.is_(None),
+            ModelConnection.profile_id == profile_id,
+            ModelConnection.deleted_at.is_(None),
+            ModelConnection.status != ConnectionStatus.DISABLED,
+        )
+    )
+    if connection:
+        return connection
+    raise AppError(
+        code="model_role_unbound",
+        message=f"No usable model is explicitly configured for {role.value}.",
+        status_code=409,
+    )
