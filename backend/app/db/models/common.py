@@ -194,6 +194,49 @@ class ConnectionStatus(StrEnum):
     DISABLED = "disabled"
 
 
+class DiscoveryProviderType(StrEnum):
+    TAVILY = "tavily"
+
+
+class DiscoverySourceMode(StrEnum):
+    SEARCH = "search"
+    URLS = "urls"
+
+
+class DiscoveryRunStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    CANCEL_REQUESTED = "cancel_requested"
+    SUCCEEDED = "succeeded"
+    PARTIAL = "partial"
+    NO_RESULTS = "no_results"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class DiscoverySourceStatus(StrEnum):
+    PENDING = "pending"
+    FETCHED = "fetched"
+    BLOCKED = "blocked"
+    FAILED = "failed"
+
+
+class DiscoveryCandidateStatus(StrEnum):
+    PROPOSED = "proposed"
+    SELECTED = "selected"
+    REJECTED = "rejected"
+    DUPLICATE = "duplicate"
+    IMPORTED = "imported"
+    FAILED = "failed"
+
+
+class DiscoveryImportStatus(StrEnum):
+    PENDING = "pending"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CONFLICTED = "conflicted"
+
+
 class EvaluationStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
@@ -204,6 +247,7 @@ class EvaluationStatus(StrEnum):
 class JobType(StrEnum):
     RESUME_PARSE = "resume_parse"
     COMPANY_RESEARCH = "company_research"
+    QUESTION_DISCOVERY = "question_discovery"
     PLAN_GENERATION = "plan_generation"
     CONTEXT_SUMMARY = "context_summary"
     MEMORY_EXTRACTION = "memory_extraction"

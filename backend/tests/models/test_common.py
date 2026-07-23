@@ -2,9 +2,16 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.db.models.common import (
+    DiscoveryCandidateStatus,
+    DiscoveryImportStatus,
+    DiscoveryProviderType,
+    DiscoveryRunStatus,
+    DiscoverySourceMode,
+    DiscoverySourceStatus,
     EntityBase,
     EvaluationAnchor,
     JobStatus,
+    JobType,
     MemoryType,
     MessageRole,
     QuestionStatus,
@@ -22,6 +29,16 @@ class EnumEnvelope(ApiModel):
     anchor: EvaluationAnchor
     role: MessageRole
     visibility: Visibility
+
+
+class DiscoveryEnumEnvelope(ApiModel):
+    provider_type: DiscoveryProviderType
+    source_mode: DiscoverySourceMode
+    run_status: DiscoveryRunStatus
+    source_status: DiscoverySourceStatus
+    candidate_status: DiscoveryCandidateStatus
+    import_status: DiscoveryImportStatus
+    job_type: JobType
 
 
 def test_entity_defaults_are_utc_versioned_and_not_deleted() -> None:
@@ -62,6 +79,28 @@ def test_stable_enums_serialize_as_strings() -> None:
         "anchor": "solid",
         "role": "assistant",
         "visibility": "private",
+    }
+
+
+def test_discovery_enums_serialize_as_stable_strings() -> None:
+    payload = DiscoveryEnumEnvelope(
+        provider_type=DiscoveryProviderType.TAVILY,
+        source_mode=DiscoverySourceMode.URLS,
+        run_status=DiscoveryRunStatus.PARTIAL,
+        source_status=DiscoverySourceStatus.BLOCKED,
+        candidate_status=DiscoveryCandidateStatus.PROPOSED,
+        import_status=DiscoveryImportStatus.SUCCEEDED,
+        job_type=JobType.QUESTION_DISCOVERY,
+    )
+
+    assert payload.model_dump() == {
+        "provider_type": "tavily",
+        "source_mode": "urls",
+        "run_status": "partial",
+        "source_status": "blocked",
+        "candidate_status": "proposed",
+        "import_status": "succeeded",
+        "job_type": "question_discovery",
     }
 
 

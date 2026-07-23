@@ -8,6 +8,15 @@ from app.db.models.context import (
     InterviewContextState,
     SummaryBundle,
 )
+from app.db.models.discovery import (
+    DiscoveryConnector,
+    QuestionDiscoveryCandidate,
+    QuestionDiscoveryCandidateEvidence,
+    QuestionDiscoveryImport,
+    QuestionDiscoveryRun,
+    QuestionDiscoverySource,
+    QuestionSourceProvenance,
+)
 from app.db.models.evaluation import (
     DimensionEvaluation,
     EvaluationReport,
@@ -44,6 +53,7 @@ __all__ = [
     "ContextSnapshot",
     "ContextSummary",
     "ConversationSegment",
+    "DiscoveryConnector",
     "DimensionEvaluation",
     "EvaluationReport",
     "EvidenceItem",
@@ -62,7 +72,13 @@ __all__ = [
     "PlanQuestion",
     "Question",
     "QuestionBank",
+    "QuestionDiscoveryCandidate",
+    "QuestionDiscoveryCandidateEvidence",
+    "QuestionDiscoveryImport",
+    "QuestionDiscoveryRun",
+    "QuestionDiscoverySource",
     "QuestionEvaluation",
+    "QuestionSourceProvenance",
     "QuestionTag",
     "QuestionTagLink",
     "QuestionVariant",
