@@ -14,6 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field
 
+from app.core.config import settings
 from app.db.models.common import (
     ConnectionStatus,
     Difficulty,
@@ -28,11 +29,9 @@ from app.db.models.common import (
     utc_now,
 )
 
-DISCOVERY_RETENTION_DAYS = 30
-
 
 def discovery_retention_expires_at() -> datetime:
-    return utc_now() + timedelta(days=DISCOVERY_RETENTION_DAYS)
+    return utc_now() + timedelta(days=settings.discovery_retention_days)
 
 
 class DiscoveryConnector(EntityBase, table=True):
@@ -50,6 +49,12 @@ class DiscoveryConnector(EntityBase, table=True):
             "profile_id",
             text("lower(name)"),
             unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        Index(
+            "ix_discovery_connectors_active_profile_provider",
+            "profile_id",
+            "provider_type",
             postgresql_where=text("deleted_at IS NULL"),
         ),
     )

@@ -349,6 +349,13 @@ async def generate_plan(session: AsyncSession, plan_id: uuid.UUID) -> InterviewP
             status_code=409,
         )
     role_matrix = load_role_matrix(config.role_name)
+    company = await session.get(Company, config.company_id)
+    if not company:
+        raise AppError(
+            code="company_not_found",
+            message="Company style context is unavailable.",
+            status_code=409,
+        )
     bank_ids = [uuid.UUID(value) for value in config.question_bank_ids]
     candidates = await build_candidate_pool(
         session,
@@ -356,6 +363,8 @@ async def generate_plan(session: AsyncSession, plan_id: uuid.UUID) -> InterviewP
         bank_ids=bank_ids,
         resume_id=config.resume_id,
         role_matrix=role_matrix,
+        company_slug=company.slug,
+        round_key=round_profile.round_key,
     )
     selected = select_candidates(
         candidates,
@@ -400,11 +409,8 @@ async def generate_plan(session: AsyncSession, plan_id: uuid.UUID) -> InterviewP
     for decision in decisions:
         candidate = candidate_by_key[decision.candidate_key]
         source_distribution[candidate.source_type.value] += 1
-        question_id = (
-            uuid.UUID(candidate.source_ref["question_id"])
-            if candidate.source_type.value == "manual"
-            else None
-        )
+        source_question_id = candidate.source_ref.get("question_id")
+        question_id = uuid.UUID(source_question_id) if source_question_id else None
         session.add(
             PlanQuestion(
                 plan_id=plan.id,

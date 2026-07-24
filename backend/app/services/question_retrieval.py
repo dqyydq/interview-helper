@@ -9,6 +9,14 @@ from app.db.models.question import Question, QuestionBank, QuestionTag, Question
 from app.db.models.resume import ResumeClaim
 from app.services.role_matrix import RoleMatrix
 
+_PLANNABLE_SOURCE_ORDER = (
+    SourceType.MANUAL,
+    SourceType.LINK_IMPORT,
+    SourceType.RESUME,
+    SourceType.GENERATED,
+)
+_SOURCE_ORDER_INDEX = {source: index for index, source in enumerate(_PLANNABLE_SOURCE_ORDER)}
+
 
 @dataclass(frozen=True, slots=True)
 class PlanCandidate:
@@ -20,6 +28,66 @@ class PlanCandidate:
     follow_up_budget: int = 2
     selection_reason: str = ""
     recent_use_count: int = 0
+    target_match_rank: int = 0
+
+
+def canonical_round_key(company_slug: str, round_key: str) -> str:
+    """Build the canonical company/round applicability key."""
+
+    return f"{company_slug.strip().casefold()}:{round_key.strip().casefold()}"
+
+
+def _applicability_values(values: list) -> set[str]:
+    return {
+        value.strip().casefold()
+        for value in values
+        if isinstance(value, str) and value.strip()
+    }
+
+
+def question_target_match_rank(
+    question: Question,
+    *,
+    company_slug: str | None,
+    round_key: str | None,
+) -> int:
+    """Return a deterministic applicability rank for a concrete plan target.
+
+    Lower ranks are preferred. Explicit mismatches stay eligible as a fallback so a
+    selected question bank never loses material silently because of metadata.
+    """
+
+    if not company_slug or not round_key:
+        return 0
+
+    company_key = company_slug.strip().casefold()
+    target_round_key = canonical_round_key(company_slug, round_key)
+    applicable_companies = _applicability_values(question.applicable_companies)
+    applicable_rounds = _applicability_values(question.applicable_rounds)
+    company_matches = company_key in applicable_companies
+    round_matches = target_round_key in applicable_rounds
+
+    # Exact canonical round match is strongest unless an optional company scope
+    # explicitly contradicts it.
+    if round_matches and (not applicable_companies or company_matches):
+        return 0
+    # Company-specific questions without a round restriction are broader but still
+    # stronger than untagged generic questions.
+    if company_matches and not applicable_rounds:
+        return 1
+    if not applicable_companies and not applicable_rounds:
+        return 2
+    # Different company or explicitly different round: retain, but demote.
+    return 3
+
+
+def _candidate_sort_key(candidate: PlanCandidate) -> tuple[int, int, int, str]:
+    return (
+        candidate.target_match_rank,
+        candidate.recent_use_count,
+        _SOURCE_ORDER_INDEX.get(candidate.source_type, len(_PLANNABLE_SOURCE_ORDER)),
+        candidate.stable_key,
+    )
 
 
 async def _question_tags(
@@ -47,6 +115,8 @@ async def build_candidate_pool(
     bank_ids: list[uuid.UUID],
     resume_id: uuid.UUID | None,
     role_matrix: RoleMatrix,
+    company_slug: str | None = None,
+    round_key: str | None = None,
 ) -> list[PlanCandidate]:
     question_statement = (
         select(Question)
@@ -64,17 +134,34 @@ async def build_candidate_pool(
     else:
         question_statement = question_statement.where(Question.id.is_(None))
     questions = list((await session.scalars(question_statement)).all())
+    questions.sort(
+        key=lambda question: (
+            question_target_match_rank(
+                question,
+                company_slug=company_slug,
+                round_key=round_key,
+            ),
+            question.times_used,
+            question.created_at,
+            question.id,
+        )
+    )
     tags = await _question_tags(session, [question.id for question in questions])
     candidates = [
         PlanCandidate(
             stable_key=f"question:{question.id}",
             prompt=question.prompt,
-            source_type=SourceType.MANUAL,
+            source_type=SourceType(question.source_type),
             source_ref={"question_id": str(question.id), "bank_id": str(question.bank_id)},
             capability_tags=tuple(tags.get(question.id, [])),
             follow_up_budget=min(3, max(1, len(question.follow_up_suggestions))),
             selection_reason="来自本场选定题库，按近期使用次数降权排序",
             recent_use_count=question.times_used,
+            target_match_rank=question_target_match_rank(
+                question,
+                company_slug=company_slug,
+                round_key=round_key,
+            ),
         )
         for question in questions
     ]
@@ -142,15 +229,19 @@ def select_candidates(
     target_count: int,
     source_weights: dict[str, float],
 ) -> list[PlanCandidate]:
-    source_order = [SourceType.MANUAL, SourceType.RESUME, SourceType.GENERATED]
+    if target_count <= 0:
+        return []
+    source_order = _PLANNABLE_SOURCE_ORDER
     grouped = {
         source: sorted(
             (candidate for candidate in candidates if candidate.source_type == source),
-            key=lambda item: (item.recent_use_count, item.stable_key),
+            key=_candidate_sort_key,
         )
         for source in source_order
     }
     positive_total = sum(max(0.0, source_weights.get(source.value, 0.0)) for source in source_order)
+    if positive_total <= 0:
+        return sorted(candidates, key=_candidate_sort_key)[:target_count]
     quotas = {
         source: int(target_count * max(0.0, source_weights.get(source.value, 0.0)) / positive_total)
         for source in source_order
@@ -174,11 +265,7 @@ def select_candidates(
                 used_keys.add(candidate.stable_key)
     remaining = sorted(
         (candidate for candidate in candidates if candidate.stable_key not in used_keys),
-        key=lambda item: (
-            item.recent_use_count,
-            source_order.index(item.source_type),
-            item.stable_key,
-        ),
+        key=_candidate_sort_key,
     )
     selected.extend(remaining[: max(0, target_count - len(selected))])
     return selected[:target_count]

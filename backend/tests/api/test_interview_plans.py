@@ -1,4 +1,5 @@
 import json
+import uuid
 from collections.abc import AsyncIterator
 from types import SimpleNamespace
 
@@ -7,7 +8,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, select
 
-from app.db.models.common import JobStatus, JobType, ModelRole, SegmentStatus
+from app.db.models.common import JobStatus, JobType, ModelRole, SegmentStatus, SourceType
 from app.db.models.company import Company
 from app.db.models.context import ConversationSegment, InterviewContextState
 from app.db.models.interview import (
@@ -363,6 +364,73 @@ async def test_plan_job_falls_back_without_calling_a_planner_that_cannot_fit_the
         plan.json()["plan_snapshot"]["planner_fallback_reason"] == "planner_context_budget_exceeded"
     )
     assert provider.requests == []
+
+
+@pytest.mark.asyncio
+async def test_plan_keeps_imported_question_ids_and_prioritizes_canonical_applicability() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        company = (await client.post("/api/companies", json=company_payload())).json()
+        bank = (await client.post("/api/question-banks", json={"name": "Imported ranking"})).json()
+        target_round = company["latest_style_pack"]["rounds"][0]["round_key"]
+        target_key = f"{company['slug']}:{target_round}"
+        specs = [
+            ("Exact canonical import", [company["slug"]], [target_key]),
+            ("Company-level import", [company["slug"]], []),
+            ("Generic import", [], []),
+            ("Mismatched import", ["another-company"], ["another-company:round_2"]),
+        ]
+        created_questions: list[dict] = []
+        for prompt, applicable_companies, applicable_rounds in specs:
+            response = await client.post(
+                "/api/questions",
+                json={
+                    "bank_id": bank["id"],
+                    "prompt": prompt,
+                    "status": "active",
+                    "applicable_companies": applicable_companies,
+                    "applicable_rounds": applicable_rounds,
+                },
+            )
+            assert response.status_code == 201
+            created_questions.append(response.json())
+
+        async with async_session_factory() as database:
+            for created_question in created_questions:
+                question = await database.get(Question, uuid.UUID(created_question["id"]))
+                assert question is not None
+                question.source_type = SourceType.LINK_IMPORT
+            await database.commit()
+
+        created = await client.post(
+            "/api/interview-plans",
+            json={
+                "company_id": company["id"],
+                "round_profile_id": company["latest_style_pack"]["rounds"][0]["id"],
+                "duration_minutes": 10,
+                "target_question_count": 4,
+                "question_bank_ids": [bank["id"]],
+                "source_weights": {"link_import": 1.0},
+            },
+        )
+        assert created.status_code == 202
+        assert await run_plan_once("imported-ranking") is True
+        plan = await client.get(f"/api/interview-plans/{created.json()['plan']['id']}")
+
+    assert plan.status_code == 200
+    questions = plan.json()["questions"]
+    assert [question["prompt_snapshot"] for question in questions] == [
+        "Exact canonical import",
+        "Company-level import",
+        "Generic import",
+        "Mismatched import",
+    ]
+    assert [question["question_id"] for question in questions] == [
+        question["id"] for question in created_questions
+    ]
+    assert {question["source_type"] for question in questions} == {"link_import"}
 
 
 @pytest.mark.asyncio

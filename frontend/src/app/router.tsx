@@ -12,6 +12,8 @@ import { CompanySelectionPage } from "../features/interviews/companies/CompanySe
 import { InterviewSetupPage } from "../features/interviews/planning/InterviewSetupPage";
 import { LiveInterviewPage } from "../features/interviews/live/LiveInterviewPage";
 import { KnowledgeBasePage } from "../features/knowledge/KnowledgeBasePage";
+import { QuestionDiscoveryPage } from "../features/discovery/QuestionDiscoveryPage";
+import { DiscoverySettingsPage } from "../features/settings/discovery/DiscoverySettingsPage";
 import { InterviewReportPage } from "../pages/InterviewReportPage";
 import { DiagnosticsPage } from "../pages/DiagnosticsPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
@@ -44,6 +46,10 @@ export const appRoutes: RouteObject[] = [
         element: <KnowledgeBasePage />,
       },
       {
+        path: "questions/discover",
+        element: <QuestionDiscoveryPage />,
+      },
+      {
         path: "reports",
         element: <InterviewReportPage />,
       },
@@ -58,6 +64,10 @@ export const appRoutes: RouteObject[] = [
       {
         path: "settings/memory",
         element: <MemorySettingsPage />,
+      },
+      {
+        path: "settings/discovery",
+        element: <DiscoverySettingsPage />,
       },
       {
         path: "settings/diagnostics",

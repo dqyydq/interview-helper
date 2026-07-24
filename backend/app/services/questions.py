@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import AppError
 from app.db.models.common import QuestionStatus, SourceType
+from app.db.models.discovery import QuestionSourceProvenance
 from app.db.models.question import (
     Question,
     QuestionBank,
@@ -414,3 +415,49 @@ async def create_variant(
     await session.commit()
     await session.refresh(variant)
     return QuestionVariantPublic.model_validate(variant)
+
+
+async def list_question_provenance(
+    session: AsyncSession,
+    profile_id: uuid.UUID,
+    question_id: uuid.UUID,
+) -> Sequence[QuestionSourceProvenance]:
+    await get_question(session, profile_id, question_id)
+    rows = await session.scalars(
+        select(QuestionSourceProvenance)
+        .where(
+            QuestionSourceProvenance.profile_id == profile_id,
+            QuestionSourceProvenance.question_id == question_id,
+            QuestionSourceProvenance.deleted_at.is_(None),
+        )
+        .order_by(
+            QuestionSourceProvenance.created_at,
+            QuestionSourceProvenance.id,
+        )
+    )
+    return rows.all()
+
+
+async def delete_question_provenance(
+    session: AsyncSession,
+    profile_id: uuid.UUID,
+    question_id: uuid.UUID,
+    provenance_id: uuid.UUID,
+) -> None:
+    await get_question(session, profile_id, question_id)
+    provenance = await session.scalar(
+        select(QuestionSourceProvenance).where(
+            QuestionSourceProvenance.id == provenance_id,
+            QuestionSourceProvenance.profile_id == profile_id,
+            QuestionSourceProvenance.question_id == question_id,
+            QuestionSourceProvenance.deleted_at.is_(None),
+        )
+    )
+    if provenance is None:
+        raise AppError(
+            code="question_provenance_not_found",
+            message="题目来源不存在。",
+            status_code=404,
+        )
+    await session.delete(provenance)
+    await session.commit()

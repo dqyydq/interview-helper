@@ -196,6 +196,7 @@ class ConnectionStatus(StrEnum):
 
 class DiscoveryProviderType(StrEnum):
     TAVILY = "tavily"
+    FIRECRAWL = "firecrawl"
 
 
 class DiscoverySourceMode(StrEnum):

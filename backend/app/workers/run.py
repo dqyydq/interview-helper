@@ -1,13 +1,17 @@
 import argparse
 import uuid
+from datetime import timedelta
 
 import anyio
 import structlog
 
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.db.models.common import utc_now
 from app.db.session import dispose_engine
 from app.workers.context_summary_jobs import run_once as run_summary_once
+from app.workers.discovery_jobs import run_once as run_discovery_once
+from app.workers.discovery_retention import run_once as run_discovery_retention_once
 from app.workers.evaluation_jobs import run_once as run_evaluation_once
 from app.workers.heartbeat import (
     WORKER_IDLE,
@@ -51,11 +55,26 @@ async def _heartbeat_loop(
 
 
 async def _run_next_job(worker_id: str, runtime: WorkerRuntime) -> bool:
+    now = utc_now()
+    if (
+        runtime.last_discovery_cleanup_at is None
+        or now - runtime.last_discovery_cleanup_at
+        >= timedelta(seconds=settings.discovery_cleanup_interval_seconds)
+    ):
+        runtime.state = WORKER_PROCESSING
+        removed = await run_discovery_retention_once()
+        runtime.last_discovery_cleanup_at = now
+        if removed:
+            runtime.last_job_type = "discovery_retention"
+            runtime.state = WORKER_IDLE
+            return True
+
     runners = (
         ("interview_evaluation", run_evaluation_once),
         ("context_summary", run_summary_once),
         ("resume_parse", run_resume_once),
         ("plan_generation", run_plan_once),
+        ("question_discovery", run_discovery_once),
     )
     for job_type, runner in runners:
         runtime.state = WORKER_PROCESSING

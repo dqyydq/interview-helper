@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { apiUrl } from "../../lib/api/client";
 import { knowledgeApi } from "./api";
@@ -497,6 +498,9 @@ export function KnowledgeBasePage() {
                   placeholder="搜索题目、技术关键词"
                 />
               </label>
+              <Link className="secondary-button" to="/questions/discover">
+                <Search size={16} aria-hidden="true" /> 发现题目
+              </Link>
               <button className="primary-button" type="button" disabled={!activeBankId} onClick={openQuestionCreate}>
                 <Plus size={16} aria-hidden="true" /> 添加题目
               </button>

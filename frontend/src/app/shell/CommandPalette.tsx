@@ -25,6 +25,13 @@ const commands = [
     icon: BookOpen,
   },
   {
+    to: "/questions/discover",
+    label: "发现题目",
+    description: "从公开资料中收集带来源证据的候选面试题",
+    keywords: "题目发现 搜索 来源 Tavily discovery research",
+    icon: Search,
+  },
+  {
     to: "/reports",
     label: "评估报告",
     description: "查看逐题证据、能力结论与训练计划",

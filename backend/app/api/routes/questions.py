@@ -6,6 +6,7 @@ from fastapi import APIRouter, Query, Response, status
 from app.api.deps import SessionDep
 from app.db.models.common import Difficulty, QuestionStatus, QuestionType
 from app.schemas.common import Page
+from app.schemas.discovery import QuestionSourceProvenancePublic
 from app.schemas.question import (
     QuestionBankCreate,
     QuestionBankPublic,
@@ -118,6 +119,33 @@ async def bulk_archive_questions(
 ) -> QuestionBulkResult:
     profile = await ensure_local_profile(session)
     return await service.archive_questions(session, profile.id, payload.question_ids)
+
+
+@router.get(
+    "/questions/{question_id}/source-provenance",
+    response_model=list[QuestionSourceProvenancePublic],
+)
+async def list_question_source_provenance(
+    question_id: uuid.UUID,
+    session: SessionDep,
+) -> list[QuestionSourceProvenancePublic]:
+    profile = await ensure_local_profile(session)
+    provenance = await service.list_question_provenance(session, profile.id, question_id)
+    return [QuestionSourceProvenancePublic.model_validate(item) for item in provenance]
+
+
+@router.delete(
+    "/questions/{question_id}/source-provenance/{provenance_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_question_source_provenance(
+    question_id: uuid.UUID,
+    provenance_id: uuid.UUID,
+    session: SessionDep,
+) -> Response:
+    profile = await ensure_local_profile(session)
+    await service.delete_question_provenance(session, profile.id, question_id, provenance_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/questions/{question_id}", response_model=QuestionPublic)

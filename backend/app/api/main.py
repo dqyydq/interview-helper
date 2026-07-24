@@ -9,6 +9,7 @@ from app.api.routes import (
     interview_sessions,
     memories,
     model_connections,
+    question_discoveries,
     questions,
     report_coach,
     reports,
@@ -19,6 +20,7 @@ from app.api.routes import (
 api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(model_connections.router)
+api_router.include_router(question_discoveries.router)
 api_router.include_router(companies.router)
 api_router.include_router(questions.router)
 api_router.include_router(reports.router)

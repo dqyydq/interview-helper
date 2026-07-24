@@ -1,4 +1,4 @@
-import { Activity, BrainCircuit, Cpu } from "lucide-react";
+import { Activity, BrainCircuit, Cpu, Search } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 export function SettingsTabs() {
@@ -11,6 +11,10 @@ export function SettingsTabs() {
       <NavLink to="/settings/memory">
         <BrainCircuit size={15} aria-hidden="true" />
         长期记忆
+      </NavLink>
+      <NavLink to="/settings/discovery">
+        <Search size={15} aria-hidden="true" />
+        题目发现
       </NavLink>
       <NavLink to="/settings/diagnostics">
         <Activity size={15} aria-hidden="true" />

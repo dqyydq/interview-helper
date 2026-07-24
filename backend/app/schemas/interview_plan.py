@@ -16,13 +16,18 @@ class InterviewPlanCreate(ApiModel):
     question_bank_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
     resume_id: uuid.UUID | None = None
     source_weights: dict[str, float] = Field(
-        default_factory=lambda: {"manual": 0.4, "resume": 0.3, "generated": 0.3}
+        default_factory=lambda: {
+            "manual": 0.4,
+            "link_import": 0.1,
+            "resume": 0.25,
+            "generated": 0.25,
+        }
     )
     preferences: dict = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_source_weights(self) -> "InterviewPlanCreate":
-        allowed = {"manual", "resume", "generated"}
+        allowed = {"manual", "link_import", "resume", "generated"}
         if set(self.source_weights) - allowed:
             raise ValueError("source weights contain an unsupported source")
         if any(value < 0 or value > 1 for value in self.source_weights.values()):

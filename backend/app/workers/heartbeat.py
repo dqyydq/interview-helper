@@ -24,6 +24,7 @@ class WorkerRuntime:
     last_job_type: str | None = None
     last_error_type: str | None = None
     last_error_at: datetime | None = None
+    last_discovery_cleanup_at: datetime | None = None
 
     def record_error(self, error: BaseException) -> None:
         self.state = WORKER_DEGRADED
