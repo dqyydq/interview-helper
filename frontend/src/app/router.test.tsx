@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { RouterProvider } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
@@ -121,14 +121,16 @@ const routes = [
 describe("application routes", () => {
   const renderRoute = (path: string) => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    return render(
+    const router = createTestRouter([path]);
+    const view = render(
       <QueryClientProvider client={queryClient}>
         <RouterProvider
-          router={createTestRouter([path])}
+          router={router}
           future={{ v7_startTransition: true }}
         />
       </QueryClientProvider>,
     );
+    return { ...view, queryClient, router };
   };
 
   it.each(routes)("renders %s", (path, heading) => {
@@ -140,5 +142,30 @@ describe("application routes", () => {
     renderRoute("/not-a-real-route");
     expect(screen.getByRole("heading", { name: "页面不存在" })).toBeInTheDocument();
     expect(screen.queryByText(/stack|exception|traceback/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps one primary workspace frame mounted across primary navigation", async () => {
+    const { container, queryClient, router, unmount } = renderRoute("/interviews");
+
+    try {
+      const workspace = container.querySelector(".workspace");
+      const frame = container.querySelector("[data-page-frame='primary']");
+
+      expect(workspace).not.toBeNull();
+      expect(frame).not.toBeNull();
+
+      await router.navigate("/questions");
+      await waitFor(() =>
+        expect(screen.getByRole("heading", { name: "面试知识库" })).toBeInTheDocument(),
+      );
+
+      expect(container.querySelector(".workspace")).toBe(workspace);
+      expect(container.querySelector("[data-page-frame='primary']")).toBe(frame);
+    } finally {
+      unmount();
+      router.dispose();
+      await queryClient.cancelQueries();
+      queryClient.clear();
+    }
   });
 });

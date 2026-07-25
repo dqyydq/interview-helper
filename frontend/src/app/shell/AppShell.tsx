@@ -50,7 +50,11 @@ export function AppShell({ children }: PropsWithChildren) {
         </span>
       </header>
 
-      <main className="workspace">{children}</main>
+      <main className="workspace">
+        <div className="workspace-frame" data-page-frame="primary">
+          {children}
+        </div>
+      </main>
       <footer className="statusbar">
         <span>Interview Helper v0.1.0</span>
         <span>LOCAL-FIRST / MIT</span>

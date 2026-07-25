@@ -1,9 +1,9 @@
 {
-  "scanned_at": "2026-07-19",
+  "scanned_at": "2026-07-25",
   "framework": "React 19 + Vite 7",
   "font_stack": "existing system sans with mono utility register",
   "palette": "existing cool-white paper, ink header, precision blue accent",
   "motion": "motion-cut; no animation library",
-  "spacing": "existing 4px and 8px aligned scale",
-  "preserved": ["application shell", "palette", "font stack", "navigation", "status bar"]
+  "spacing": "existing 4px and 8px aligned scale, now with a shared 1500px primary page frame",
+  "preserved": ["application shell", "palette", "font stack", "navigation", "status bar", "page content architecture"]
 }

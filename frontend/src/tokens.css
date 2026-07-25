@@ -37,6 +37,19 @@
   --space-report-12: 3rem;
   --space-report-16: 4rem;
 
+  /* Shared application geometry. Primary navigation always lands inside the
+   * same frame; individual work surfaces may grow vertically for their data. */
+  --layout-workspace-gutter: clamp(1.5rem, 5vw, 4.5rem);
+  --layout-primary-max-inline: 93.75rem;
+  --layout-fixed-navigation-block: 0px;
+  --layout-primary-min-block: min(
+    47.5rem,
+    calc(
+      100dvh - 7.125rem - var(--layout-fixed-navigation-block) - var(--layout-workspace-gutter) -
+        var(--layout-workspace-gutter)
+    )
+  );
+
   --text-report-xs: 0.6875rem;
   --text-report-sm: 0.8125rem;
   --text-report-md: 0.9375rem;
