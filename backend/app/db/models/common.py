@@ -194,6 +194,13 @@ class ConnectionStatus(StrEnum):
     DISABLED = "disabled"
 
 
+class EmbeddingProfileStatus(StrEnum):
+    BUILDING = "building"
+    ACTIVE = "active"
+    FAILED = "failed"
+    RETIRED = "retired"
+
+
 class DiscoveryProviderType(StrEnum):
     TAVILY = "tavily"
     FIRECRAWL = "firecrawl"
@@ -252,4 +259,5 @@ class JobType(StrEnum):
     PLAN_GENERATION = "plan_generation"
     CONTEXT_SUMMARY = "context_summary"
     MEMORY_EXTRACTION = "memory_extraction"
+    EMBEDDING_REINDEX = "embedding_reindex"
     INTERVIEW_EVALUATION = "interview_evaluation"

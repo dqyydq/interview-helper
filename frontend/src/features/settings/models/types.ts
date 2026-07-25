@@ -1,6 +1,8 @@
 export type ProviderType = "openai_compatible" | "anthropic_compatible";
 export type ConnectionStatus = "untested" | "healthy" | "degraded" | "disabled";
 export type LocalCapabilityStatus = "ready" | "unavailable" | "mismatch";
+export type EmbeddingProfileStatus = "building" | "active" | "failed" | "retired";
+export type BackgroundJobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
 export const modelRoles = [
   "interviewer",
@@ -64,6 +66,57 @@ export interface ModelReadiness {
   ready: boolean;
   missing_roles: ModelRole[];
   degraded_roles: ModelRole[];
+}
+
+export interface EmbeddingIndexProfile {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  version: number;
+  target_kind: "model_connection" | "local_capability";
+  model_name: string;
+  model_revision: string;
+  vector_dimensions: number | null;
+  normalized: boolean;
+  distance_metric: string;
+  status: EmbeddingProfileStatus;
+  activated_at: string | null;
+  failed_at: string | null;
+  failure_code: string | null;
+  failure_summary: string | null;
+}
+
+export interface EmbeddingIndexJob {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  version: number;
+  status: BackgroundJobStatus;
+  progress: number;
+  phase: string;
+  memory_scanned: number;
+  memory_embeddings: number;
+  plan_question_scanned: number;
+  plan_question_embeddings: number;
+  vector_dimensions: number | null;
+  error_code: string | null;
+  attempts: number;
+  max_attempts: number;
+  available_at: string;
+}
+
+export interface EmbeddingIndexStatus {
+  active_profile: EmbeddingIndexProfile | null;
+  building_profile: EmbeddingIndexProfile | null;
+  latest_failed_profile: EmbeddingIndexProfile | null;
+  job: EmbeddingIndexJob | null;
+  interview_active: boolean;
+}
+
+export interface EmbeddingIndexRebuildResult {
+  embedding_profile: EmbeddingIndexProfile;
+  job: EmbeddingIndexJob;
+  created: boolean;
 }
 
 export interface ConnectionDraft {

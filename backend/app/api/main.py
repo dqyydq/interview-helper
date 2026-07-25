@@ -4,6 +4,7 @@ from app.api.routes import (
     companies,
     context_diagnostics,
     diagnostics,
+    embedding_index,
     health,
     interview_plans,
     interview_sessions,
@@ -22,6 +23,7 @@ api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(local_ai.router)
 api_router.include_router(model_connections.router)
+api_router.include_router(embedding_index.router)
 api_router.include_router(question_discoveries.router)
 api_router.include_router(companies.router)
 api_router.include_router(questions.router)

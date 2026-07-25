@@ -17,6 +17,11 @@ from app.db.models.discovery import (
     QuestionDiscoverySource,
     QuestionSourceProvenance,
 )
+from app.db.models.embedding import (
+    EmbeddingProfile,
+    MemoryEmbedding,
+    PlanQuestionEmbedding,
+)
 from app.db.models.evaluation import (
     DimensionEvaluation,
     EvaluationReport,
@@ -55,6 +60,7 @@ __all__ = [
     "ConversationSegment",
     "DiscoveryConnector",
     "DimensionEvaluation",
+    "EmbeddingProfile",
     "EvaluationReport",
     "EvidenceItem",
     "InterviewConfig",
@@ -64,12 +70,14 @@ __all__ = [
     "InterviewRealtimeEvent",
     "InterviewSession",
     "MemoryConflict",
+    "MemoryEmbedding",
     "MemoryItem",
     "MemorySource",
     "MemoryUsage",
     "ModelConnection",
     "ModelRoleBinding",
     "PlanQuestion",
+    "PlanQuestionEmbedding",
     "Question",
     "QuestionBank",
     "QuestionDiscoveryCandidate",

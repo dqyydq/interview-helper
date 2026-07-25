@@ -1,6 +1,8 @@
 import { apiRequest } from "../../../lib/api/client";
 import type {
   ConnectionDraft,
+  EmbeddingIndexRebuildResult,
+  EmbeddingIndexStatus,
   LocalCapability,
   ModelConnection,
   ModelReadiness,
@@ -18,6 +20,10 @@ export const modelConnectionApi = {
     }),
   remove: (connectionId: string) =>
     apiRequest<void>(`/model-connections/${connectionId}`, { method: "DELETE" }),
+  redactCredentials: (connectionId: string) =>
+    apiRequest<ModelConnection>(`/model-connections/${connectionId}/redact-credentials`, {
+      method: "POST",
+    }),
   test: (connectionId: string) =>
     apiRequest<{ status: string; latency_ms: number; error_code?: string }>(
       `/model-connections/${connectionId}/test`,
@@ -35,4 +41,7 @@ export const modelConnectionApi = {
   listLocalCapabilities: () => apiRequest<LocalCapability[]>("/local-ai/capabilities"),
   testLocalCapability: (key: string) =>
     apiRequest<LocalCapability>(`/local-ai/capabilities/${key}/test`, { method: "POST" }),
+  embeddingIndexStatus: () => apiRequest<EmbeddingIndexStatus>("/embedding-index"),
+  rebuildEmbeddingIndex: () =>
+    apiRequest<EmbeddingIndexRebuildResult>("/embedding-index/rebuild", { method: "POST" }),
 };

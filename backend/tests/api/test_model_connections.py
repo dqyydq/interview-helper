@@ -9,6 +9,7 @@ from app.api.errors import AppError
 from app.core.config import settings
 from app.core.crypto import SecretCipher
 from app.db.models.common import ConnectionStatus, ModelRole
+from app.db.models.embedding import EmbeddingProfile
 from app.db.models.model_connection import ModelConnection, ModelRoleBinding
 from app.db.models.profile import UserProfile
 from app.db.session import async_session_factory, engine
@@ -43,6 +44,7 @@ class HealthyProvider(ChatProvider):
 async def clear_model_settings() -> None:
     async with async_session_factory() as session:
         await session.execute(delete(ModelRoleBinding))
+        await session.execute(delete(EmbeddingProfile))
         await session.execute(delete(ModelConnection))
         await session.execute(delete(UserProfile))
         await session.commit()
@@ -226,6 +228,68 @@ async def test_deleting_connection_removes_encrypted_secret_and_role_binding() -
         bindings = (await session.scalars(select(ModelRoleBinding))).all()
     assert connection is None
     assert bindings == []
+
+
+@pytest.mark.asyncio
+async def test_historic_embedding_connection_can_redact_credentials_after_roles_are_unbound(
+) -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        created = await client.post("/api/model-connections", json=connection_payload("historic"))
+        connection_id = created.json()["id"]
+        bound = await client.put(
+            "/api/model-connections/roles/embedding",
+            json={"connection_id": connection_id},
+        )
+        blocked = await client.post(f"/api/model-connections/{connection_id}/redact-credentials")
+        unbound = await client.delete("/api/model-connections/roles/embedding")
+
+    assert created.status_code == 201
+    assert bound.status_code == 200
+    assert blocked.status_code == 409
+    assert blocked.json()["code"] == "model_connection_still_bound"
+    assert unbound.status_code == 204
+
+    async with async_session_factory() as session:
+        profile = await session.scalar(select(UserProfile))
+        connection = await session.get(ModelConnection, connection_id)
+        assert profile is not None
+        assert connection is not None
+        index_history = EmbeddingProfile(
+            profile_id=profile.id,
+            model_connection_id=connection.id,
+            target_fingerprint="f" * 64,
+            model_name=connection.model_name,
+            model_revision="provider-configured",
+            vector_dimensions=3,
+            status="active",
+        )
+        session.add(index_history)
+        await session.commit()
+        index_history_id = index_history.id
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        redacted = await client.post(f"/api/model-connections/{connection_id}/redact-credentials")
+
+    assert redacted.status_code == 200
+    assert redacted.json()["has_api_key"] is False
+    assert redacted.json()["status"] == "disabled"
+    assert "secret-historic" not in redacted.text
+
+    async with async_session_factory() as session:
+        connection = await session.get(ModelConnection, connection_id)
+        index_history = await session.get(EmbeddingProfile, index_history_id)
+    assert connection is not None
+    assert connection.encrypted_api_key is None
+    assert connection.extra_headers_encrypted == {}
+    assert ConnectionStatus(connection.status) is ConnectionStatus.DISABLED
+    assert index_history is not None
+    assert index_history.model_connection_id == connection.id
 
 
 @pytest.mark.asyncio

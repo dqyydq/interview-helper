@@ -20,6 +20,14 @@ vi.mock("../features/settings/models/api", () => ({
     }),
     listLocalCapabilities: vi.fn().mockResolvedValue([]),
     testLocalCapability: vi.fn(),
+    embeddingIndexStatus: vi.fn().mockResolvedValue({
+      active_profile: null,
+      building_profile: null,
+      latest_failed_profile: null,
+      job: null,
+      interview_active: false,
+    }),
+    rebuildEmbeddingIndex: vi.fn(),
   },
 }));
 

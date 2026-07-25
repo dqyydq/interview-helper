@@ -3,6 +3,8 @@ import {
   AlertTriangle,
   Check,
   Cpu,
+  Database,
+  KeyRound,
   LoaderCircle,
   Play,
   Plus,
@@ -16,6 +18,7 @@ import { modelConnectionApi } from "./api";
 import {
   modelRoles,
   type ConnectionDraft,
+  type EmbeddingIndexStatus,
   type LocalCapability,
   type ModelConnection,
   type ModelRole,
@@ -129,6 +132,59 @@ function getLocalCapabilityPresentation(
   };
 }
 
+function embeddingIndexIsActive(status: EmbeddingIndexStatus | undefined) {
+  return Boolean(
+    (status?.building_profile
+      && (!status.job || status.job.status === "queued" || status.job.status === "running"))
+    || status?.job?.status === "queued"
+    || status?.job?.status === "running",
+  );
+}
+
+function hasCurrentEmbeddingIndexFailure(status: EmbeddingIndexStatus | undefined) {
+  const failed = status?.latest_failed_profile;
+  if (!failed) return false;
+  const active = status?.active_profile;
+  if (!active) return true;
+  return Date.parse(failed.created_at) > Date.parse(active.created_at);
+}
+
+function embeddingIndexHeadline(status: EmbeddingIndexStatus | undefined) {
+  if (status?.interview_active) return "面试进行中，索引任务将暂停";
+  if (status?.building_profile && status.job?.phase === "waiting_for_interview") {
+    return "已暂停，正在优先保障面试响应";
+  }
+  if (status?.building_profile) return "正在后台构建语义索引";
+  if (hasCurrentEmbeddingIndexFailure(status) && status?.active_profile) {
+    return "新索引未构建完成，仍在使用上一版";
+  }
+  if (hasCurrentEmbeddingIndexFailure(status)) return "上一次构建未完成";
+  if (status?.active_profile) return "语义索引已就绪";
+  return "尚未建立语义索引";
+}
+
+function embeddingIndexDetail(status: EmbeddingIndexStatus | undefined) {
+  if (status?.interview_active || status?.job?.phase === "waiting_for_interview") {
+    return "后台任务会自动让出资源；当前面试不会等待向量检索或重新嵌入。";
+  }
+  if (status?.building_profile && status.active_profile) {
+    return "旧索引仍在服务本次面试；新索引验证完成后才会原子切换。";
+  }
+  if (status?.building_profile) {
+    return "构建在后台分批进行，期间仍可正常使用关键词检索。";
+  }
+  if (hasCurrentEmbeddingIndexFailure(status) && status?.active_profile) {
+    return `${status.latest_failed_profile?.failure_summary ?? "新索引未能完成构建。"}旧索引仍在服务，可修正配置后重新构建。`;
+  }
+  if (hasCurrentEmbeddingIndexFailure(status)) {
+    return status?.latest_failed_profile?.failure_summary ?? "请检查嵌入模型连接后重新构建。";
+  }
+  if (status?.active_profile) {
+    return "面试仅查询已缓存的向量，不会在对话中调用嵌入模型。";
+  }
+  return "先为“向量检索”角色绑定 OpenAI-compatible 或本地 Docker 嵌入模型。";
+}
+
 export function ModelSettingsPage() {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(initialDraft);
@@ -142,6 +198,11 @@ export function ModelSettingsPage() {
     queryKey: ["local-ai-capabilities"],
     queryFn: modelConnectionApi.listLocalCapabilities,
   });
+  const embeddingIndex = useQuery({
+    queryKey: ["embedding-index"],
+    queryFn: modelConnectionApi.embeddingIndexStatus,
+    refetchInterval: (query) => embeddingIndexIsActive(query.state.data) ? 1_800 : false,
+  });
 
   const refresh = async () => {
     await Promise.all([
@@ -149,6 +210,7 @@ export function ModelSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["model-bindings"] }),
       queryClient.invalidateQueries({ queryKey: ["model-readiness"] }),
       queryClient.invalidateQueries({ queryKey: ["local-ai-capabilities"] }),
+      queryClient.invalidateQueries({ queryKey: ["embedding-index"] }),
     ]);
   };
 
@@ -166,6 +228,10 @@ export function ModelSettingsPage() {
   });
   const deleteConnection = useMutation({
     mutationFn: modelConnectionApi.remove,
+    onSuccess: refresh,
+  });
+  const redactConnection = useMutation({
+    mutationFn: modelConnectionApi.redactCredentials,
     onSuccess: refresh,
   });
   const bindRole = useMutation({
@@ -189,6 +255,10 @@ export function ModelSettingsPage() {
       setCheckingCapabilityKey(null);
     },
   });
+  const rebuildEmbeddingIndex = useMutation({
+    mutationFn: modelConnectionApi.rebuildEmbeddingIndex,
+    onSuccess: refresh,
+  });
 
   const updateProvider = (providerType: ProviderType) => {
     setDraft((current) => ({
@@ -211,12 +281,49 @@ export function ModelSettingsPage() {
     bindings.error,
     readiness.error,
     localCapabilities.error,
+    embeddingIndex.error,
     createConnection.error,
+    testConnection.error,
+    deleteConnection.error,
+    redactConnection.error,
     unbindRole.error,
     testLocalCapability.error,
+    rebuildEmbeddingIndex.error,
   ].find(
     (item) => item instanceof Error,
   );
+  const embeddingBinding = bindings.data?.find((binding) => binding.role === "embedding");
+  const boundEmbeddingCapability =
+    embeddingBinding?.target_kind === "local_capability"
+      ? localCapabilities.data?.find(
+          (capability) => capability.key === embeddingBinding.local_capability_key,
+        )
+      : undefined;
+  const embeddingLocalCapabilityReady =
+    embeddingBinding?.target_kind !== "local_capability"
+    || (boundEmbeddingCapability !== undefined
+      && getLocalCapabilityPresentation(boundEmbeddingCapability, localCapabilities.data).displayStatus === "ready");
+  const embeddingIndexUnavailableLocalTarget = Boolean(
+    embeddingBinding?.target_kind === "local_capability" && !embeddingLocalCapabilityReady,
+  );
+  const embeddingRebuildTitle = !embeddingBinding
+    ? "请先绑定“向量检索”模型"
+    : embeddingIndexUnavailableLocalTarget
+      ? `请先启动 ${boundEmbeddingCapability?.compose_profile ?? "本地 Docker 嵌入服务"} 并检查服务`
+      : undefined;
+  const embeddingIndexBusy = embeddingIndexIsActive(embeddingIndex.data);
+  const embeddingIndexJob = embeddingIndex.data?.job;
+  const embeddingIndexProgress = embeddingIndexJob
+    ? Math.round(embeddingIndexJob.progress * 100)
+    : 0;
+  const indexedSources = embeddingIndexJob
+    ? embeddingIndexJob.memory_embeddings + embeddingIndexJob.plan_question_embeddings
+    : 0;
+  const rebuildLabel = embeddingIndexBusy
+    ? "后台构建中"
+    : embeddingIndex.data?.active_profile
+      ? "重新构建"
+      : "建立索引";
 
   return (
     <section className="settings-console" aria-labelledby="settings-title">
@@ -379,13 +486,34 @@ export function ModelSettingsPage() {
                   <button
                     type="button"
                     aria-label={`测试 ${connection.name}`}
+                    title="测试连接"
                     onClick={() => testConnection.mutate(connection.id)}
                   >
                     <Play size={15} aria-hidden="true" />
                   </button>
+                  {connection.has_api_key && (
+                    <button
+                      type="button"
+                      aria-label={`清除 ${connection.name} 的密钥并停用`}
+                      title="清除密钥并停用"
+                      disabled={redactConnection.isPending}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `清除“${connection.name}”的 API Key 和额外请求头，并停用该连接？此操作不可撤销。`,
+                          )
+                        ) {
+                          redactConnection.mutate(connection.id);
+                        }
+                      }}
+                    >
+                      <KeyRound size={15} aria-hidden="true" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     aria-label={`删除 ${connection.name}`}
+                    title="删除连接"
                     onClick={() => {
                       if (window.confirm(`删除“${connection.name}”及其本地密钥？`)) {
                         deleteConnection.mutate(connection.id);
@@ -475,6 +603,77 @@ export function ModelSettingsPage() {
               <div className="connection-empty">本地 Docker 能力目录暂不可用。</div>
             )}
           </div>
+
+          <section className="embedding-index-panel" aria-labelledby="embedding-index-title">
+            <div className="panel-heading">
+              <div>
+                <span>04 / SEMANTIC MEMORY</span>
+                <h2 id="embedding-index-title">语义索引</h2>
+              </div>
+              <button
+                className="secondary-button embedding-index-action"
+                type="button"
+                aria-busy={rebuildEmbeddingIndex.isPending}
+                disabled={
+                  !embeddingBinding
+                  || embeddingIndexUnavailableLocalTarget
+                  || embeddingIndexBusy
+                  || rebuildEmbeddingIndex.isPending
+                }
+                title={embeddingRebuildTitle}
+                onClick={() => rebuildEmbeddingIndex.mutate()}
+              >
+                {rebuildEmbeddingIndex.isPending || embeddingIndexBusy ? (
+                  <LoaderCircle className="local-capability-spinner" size={15} aria-hidden="true" />
+                ) : (
+                  <Database size={15} aria-hidden="true" />
+                )}
+                {rebuildLabel}
+              </button>
+            </div>
+            <article
+              className={`embedding-index-status ${embeddingIndexBusy ? "building" : ""}`}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <div>
+                <strong>{embeddingIndexHeadline(embeddingIndex.data)}</strong>
+                <span>{embeddingIndexDetail(embeddingIndex.data)}</span>
+              </div>
+              {embeddingIndexJob && (
+                <div className="embedding-index-progress" aria-label={`索引进度 ${embeddingIndexProgress}%`}>
+                  <span className="embedding-index-progress-track" aria-hidden="true">
+                    <span style={{ width: `${embeddingIndexProgress}%` }} />
+                  </span>
+                  <small>
+                    {embeddingIndexProgress}% · 已写入 {indexedSources} 条缓存
+                    {embeddingIndexJob.vector_dimensions
+                      ? ` · ${embeddingIndexJob.vector_dimensions} 维`
+                      : ""}
+                  </small>
+                </div>
+              )}
+              {!embeddingIndexJob && embeddingIndex.data?.active_profile && (
+                <small className="embedding-index-active-model">
+                  {embeddingIndex.data.active_profile.model_name}
+                  {embeddingIndex.data.active_profile.vector_dimensions
+                    ? ` · ${embeddingIndex.data.active_profile.vector_dimensions} 维`
+                    : ""}
+                </small>
+              )}
+            </article>
+            <p className="embedding-index-note">
+              索引只由后台任务更新。面试进行时会自动暂停，检索始终优先使用已验证的缓存；
+              未建立索引时安全回退到关键词检索。
+            </p>
+            {embeddingIndexUnavailableLocalTarget && (
+              <p className="embedding-index-note embedding-index-blocked">
+                已绑定 {boundEmbeddingCapability?.title ?? "本地 Docker 嵌入服务"}；请先启动 {boundEmbeddingCapability?.compose_profile ?? "对应服务"}
+                并点击“检查”，确认就绪后再建立索引。
+              </p>
+            )}
+          </section>
         </section>
 
         <aside className="routing-panel" aria-labelledby="routing-title">
@@ -489,7 +688,7 @@ export function ModelSettingsPage() {
             {modelRoles.map((role) => {
               const binding = bindings.data?.find((item) => item.role === role);
               const required = role === "interviewer" || role === "evaluator";
-              const roleConnections = role === "transcriber"
+              const roleConnections = role === "transcriber" || role === "embedding"
                 ? connections.data?.filter(
                     (connection) => connection.provider_type === "openai_compatible",
                   )

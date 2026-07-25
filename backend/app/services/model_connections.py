@@ -8,6 +8,7 @@ from app.api.errors import AppError
 from app.core.config import settings
 from app.core.crypto import SecretCipher
 from app.db.models.common import ConnectionStatus, ModelRole, ProviderType
+from app.db.models.embedding import EmbeddingProfile
 from app.db.models.model_connection import ModelConnection, ModelRoleBinding
 from app.db.models.profile import UserProfile
 from app.local_ai.capabilities import LocalCapabilityDefinition, get_local_capability
@@ -137,11 +138,65 @@ async def update_connection(
 
 
 async def delete_connection(session: AsyncSession, connection: ModelConnection) -> None:
+    embedding_profile_id = await session.scalar(
+        select(EmbeddingProfile.id)
+        .where(
+            EmbeddingProfile.model_connection_id == connection.id,
+        )
+        .limit(1)
+    )
+    if embedding_profile_id is not None:
+        # The index stores an immutable, auditable vector-space snapshot.  A
+        # raw FK failure would be opaque to users and could tempt a caller to
+        # delete history out-of-band, so make this retention boundary explicit.
+        raise AppError(
+            code="model_connection_embedding_history_exists",
+            message=(
+                "该模型连接仍被向量索引历史引用，无法删除；请先解除角色绑定，"
+                "再清除密钥并停用。索引历史会保留。"
+            ),
+            status_code=409,
+        )
     await session.execute(
         delete(ModelRoleBinding).where(ModelRoleBinding.connection_id == connection.id)
     )
     await session.delete(connection)
     await session.commit()
+
+
+async def redact_connection_credentials(
+    session: AsyncSession,
+    connection: ModelConnection,
+) -> ModelConnection:
+    """Remove stored credentials while retaining immutable index provenance.
+
+    Embedding profiles intentionally retain a foreign key to the connection so
+    a served vector space remains auditable.  That must never trap a retired
+    cloud credential: after the user moves every Agent role elsewhere, remove
+    the encrypted key and headers and disable the retained connection row.
+    """
+
+    active_binding_id = await session.scalar(
+        select(ModelRoleBinding.id)
+        .where(
+            ModelRoleBinding.connection_id == connection.id,
+            ModelRoleBinding.deleted_at.is_(None),
+        )
+        .limit(1)
+    )
+    if active_binding_id is not None:
+        raise AppError(
+            code="model_connection_still_bound",
+            message="请先解除该模型连接的所有 Agent 角色绑定，再清除密钥并停用。",
+            status_code=409,
+        )
+    connection.encrypted_api_key = None
+    connection.extra_headers_encrypted = {}
+    connection.status = ConnectionStatus.DISABLED
+    connection.touch()
+    await session.commit()
+    await session.refresh(connection)
+    return connection
 
 
 async def test_connection(

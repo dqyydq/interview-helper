@@ -24,6 +24,11 @@ class MemoryItem(EntityBase, table=True):
             "memory_version",
             name="uq_memory_item_version",
         ),
+        UniqueConstraint(
+            "profile_id",
+            "id",
+            name="uq_memory_item_profile_identity",
+        ),
     )
 
     profile_id: uuid.UUID = Field(

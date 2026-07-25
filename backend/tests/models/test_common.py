@@ -8,6 +8,7 @@ from app.db.models.common import (
     DiscoveryRunStatus,
     DiscoverySourceMode,
     DiscoverySourceStatus,
+    EmbeddingProfileStatus,
     EntityBase,
     EvaluationAnchor,
     JobStatus,
@@ -38,6 +39,11 @@ class DiscoveryEnumEnvelope(ApiModel):
     source_status: DiscoverySourceStatus
     candidate_status: DiscoveryCandidateStatus
     import_status: DiscoveryImportStatus
+    job_type: JobType
+
+
+class EmbeddingEnumEnvelope(ApiModel):
+    status: EmbeddingProfileStatus
     job_type: JobType
 
 
@@ -101,6 +107,18 @@ def test_discovery_enums_serialize_as_stable_strings() -> None:
         "candidate_status": "proposed",
         "import_status": "succeeded",
         "job_type": "question_discovery",
+    }
+
+
+def test_embedding_enums_serialize_as_stable_strings() -> None:
+    payload = EmbeddingEnumEnvelope(
+        status=EmbeddingProfileStatus.BUILDING,
+        job_type=JobType.EMBEDDING_REINDEX,
+    )
+
+    assert payload.model_dump() == {
+        "status": "building",
+        "job_type": "embedding_reindex",
     }
 
 

@@ -1,6 +1,6 @@
 # Docker-only 本地 AI
 
-> 状态：Docker 交付底座、受校验的模型 loader、离线 FunASR 与 TEI 运行 profile，以及应用内的本地能力探测和角色绑定已建立；pgvector 检索接入仍在后续阶段实现。
+> 状态：Docker 交付底座、受校验的模型 loader、离线 FunASR 与 TEI 运行 profile、应用内的本地能力探测和角色绑定，以及 pgvector 后台语义索引均已建立。
 
 Interview Helper 的本地语音转写与本地 embedding 只会通过 Docker 容器运行。宿主机不需要、也不应为本应用安装 FunASR、TEI、PyTorch、CUDA Python 包或模型运行时。云端模型仍然是独立、显式选择的选项；本地服务故障时应用不得把音频、简历或回答静默发送到云端。
 
@@ -11,7 +11,7 @@ Interview Helper 的本地语音转写与本地 embedding 只会通过 Docker �
 - `interview-helper-models` 保存将来已校验的模型文件，`interview-helper-model-state` 保存下载和校验状态；它们与业务数据库 volume 分离。
 - `model-loader` 位于显式的 `model-loader` profile。普通 `docker compose up -d postgres` 不会启动它，也不会拉取镜像、构建镜像或下载模型。
 - loader 只能安装受支持 preset：SenseVoiceSmall、multilingual-e5-small 和 BGE-M3。每个 preset 固定到不可变的 ModelScope commit；它会先检查模型 volume 的保守可用空间，再写入 staging 区、逐文件校验 SHA-256，成功后才原子写入 active marker；离线包还必须带匹配的 `offline-manifest.json`。同一 preset 的安装会通过共享 state volume 串行化，避免重复点击或两个容器竞争覆盖 active 状态。
-- 本阶段已经提供本地 FunASR 与 TEI 的 Docker profile、设置页探测和 `Transcriber` / `Embedding` 的本地能力绑定；pgvector Alembic migration 仍未完成。不要手工执行 `CREATE EXTENSION vector`。
+- 本阶段已经提供本地 FunASR 与 TEI 的 Docker profile、设置页探测和 `Transcriber` / `Embedding` 的本地能力绑定。`0008` / `0009` Alembic migration 会启用 `vector` 扩展并创建隔离的向量表；不要手工执行 `CREATE EXTENSION vector`。
 
 只检查 Compose 文件时使用：
 
@@ -20,9 +20,9 @@ docker compose config --quiet
 docker compose --profile model-loader config --quiet
 ```
 
-以上检查不会启动或拉取容器。当前 loader 会先把模型下载或导入到 staging、校验清单和哈希，再原子地标记为已验证；推理服务接入后还会增加真实推理冒烟验证。面试过程中不会下载模型、预热模型、重嵌入或建立向量索引。
+以上检查不会启动或拉取容器。当前 loader 会先把模型下载或导入到 staging、校验清单和哈希，再原子地标记为已验证。面试过程中不会下载模型、预热模型、重嵌入或建立向量索引。
 
-`model-loader` 的 `status` / `verify` 命令不会访问网络；`install` 是唯一会从 ModelScope 下载权重的操作。开发人员需要显式运行该命令才会构建 loader 镜像并进入下载流程。推理服务尚未接入前，不要把“权重已校验”误认为“本地转写或检索已经可用”。
+`model-loader` 的 `status` / `verify` 命令不会访问网络；`install` 是唯一会从 ModelScope 下载权重的操作。开发人员需要显式运行该命令才会构建 loader 镜像并进入下载流程。仅当模型权重已校验、但对应推理 profile 尚未启动时，不要把“权重已校验”误认为“本地转写或检索已经可用”。
 
 如果主机被关闭或 loader 被强制终止，确认**没有同一 preset 的安装仍在运行**后，才可以显式清理其锁；该命令不会删除模型、active marker 或 PostgreSQL 数据：
 
@@ -84,6 +84,8 @@ docker compose --profile local-embedding-bge up -d local-embedding-bge
 
 这些限制同时由后端和数据库约束执行，因此本地转写不会被当成聊天模型，也不需要填写假的 API Key。服务未启动时也可以先保存绑定；发起转写时会明确报出本地服务不可达，不会静默回退到云端。
 
+首次绑定或更换 embedding 模型后，再点击“语义索引 → 创建/重建索引”。它只创建一条后台任务：worker 会按小批次预计算长期记忆和已生成面试题的向量，并在启用前进行有限次覆盖校验，避免构建期间的编辑漏入新索引。任务构建新索引期间，旧的可用索引继续服务；完成后才原子切换。若没有已完成的向量索引、或当前题目尚未被缓存，面试仍使用既有的全文检索，不会在实时回合临时请求 embedding 服务。实时向量精排使用 120 ms 的数据库语句上限，超时会直接安全回退全文检索。若用户正在面试，索引任务会自动让出并稍后继续，因此不会把等待时间转移到候选人的回答上。
+
 停止本地运行服务不会删除模型或数据库：
 
 ```powershell
@@ -99,7 +101,7 @@ docker compose --profile local-embedding-e5 stop local-embedding-e5
 - Windows 用户如需容器 GPU，应使用 WSL 2 backend、受支持的 NVIDIA GPU 和驱动；没有 GPU 仍可走后续的 CPU 方案。
 - 应用本身仍按 [本地开发与测试](local-development.md) 使用 uv 管理后端环境。Docker-only 的含义是**本地 AI 运行时**不在宿主机安装，不是替代应用的 Python/Node 开发环境。
 
-模型来源会以 ModelScope 为默认优先级，Hugging Face 仅作为用户明确选择的备用来源；也会支持经过校验的离线导入。无论来源如何，模型文件不得在浏览器中下载、不得由浏览器传入任意路径，也不得在面试回合内变更。
+模型来源以 ModelScope 为默认且当前唯一的联网下载路径；无法访问时，使用经过 `offline-manifest.json` 校验的离线导入。无论来源如何，模型文件不得在浏览器中下载、不得由浏览器传入任意路径，也不得在面试回合内变更。
 
 ## 从旧版 PostgreSQL 安全升级
 
@@ -133,7 +135,7 @@ docker compose --profile local-embedding-e5 stop local-embedding-e5
 
    **绝不能使用 `docker compose down -v`，也不要使用 `docker volume rm interview-helper-postgres`。** 这两种操作会删除本地业务数据。
 
-5. 确认应用数据库仍可连接后，再在未来包含正式 Alembic migration 的版本执行 `python -m alembic upgrade head`。扩展由 migration 管理，不能依赖 init SQL：init SQL 只在全新 volume 初始化时运行。
+5. 确认应用数据库仍可连接后，执行 `python -m alembic upgrade head`。扩展由 migration 管理，不能依赖 init SQL：init SQL 只在全新 volume 初始化时运行。
 
 如 PostgreSQL 无法启动、日志出现 data directory 或 major-version 错误，立即停止，不要删除或重建原 volume。保留原 volume、日志和 dump，在独立副本上验证恢复路径后再处理。模型 volumes 不是业务数据备份的替代品；它们可由受控 manifest 重新获得，而数据库、上传文件和加密密钥仍必须按 [隐私与本地数据](privacy.md) 备份。
 

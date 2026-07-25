@@ -9,7 +9,7 @@
 | React/Vite | `http://localhost:5173` | 产品界面 |
 | FastAPI | `http://localhost:8000` | REST、SSE 与 WebSocket |
 | PostgreSQL | `127.0.0.1:5432` | 持久化事实源（pgvector PostgreSQL 17 镜像） |
-| Worker | 无端口 | 计划、简历、摘要与评估任务 |
+| Worker | 无端口 | 计划、简历、摘要、评估与后台语义索引任务 |
 | Mock Provider | `http://127.0.0.1:8010` | 本地确定性开发演示 |
 
 ## 初始化
@@ -35,9 +35,9 @@ npm ci
 
 ## Docker-only 本地 AI 底座
 
-本地 ASR 与 embedding 的运行时将只通过 Docker 提供，宿主机不安装 FunASR、TEI、PyTorch 或模型运行时。当前提交建立了受控 named volumes、禁用默认启动的 `model-loader` profile 与离线可验证的权重交付器；本地 FunASR / TEI 推理服务仍未接入。
+本地 ASR 与 embedding 的运行时只通过 Docker 提供，宿主机不安装 FunASR、TEI、PyTorch 或模型运行时。受控 named volumes、禁用默认启动的 `model-loader` profile、离线可验证的权重交付器、本地 FunASR / TEI 推理服务，以及 pgvector 后台索引均已接入。
 
-普通的 `docker compose up -d postgres` 不会下载模型。面试进行中也不会下载模型、预热模型或重建向量索引。`postgres` 现使用不可变的 pgvector 0.8.1 / PostgreSQL 17 镜像，并只绑定到 `127.0.0.1`；已有 `interview-helper-postgres` volume 的安全升级与备份步骤见 [Docker-only 本地 AI](local-ai.md)。升级时绝不能使用 `docker compose down -v`。
+普通的 `docker compose up -d postgres` 不会下载模型。面试进行中也不会下载模型、预热模型或重建向量索引；重建由 worker 在后台运行，并在有实时面试时自动让出。`postgres` 现使用不可变的 pgvector 0.8.1 / PostgreSQL 17 镜像，并只绑定到 `127.0.0.1`；已有 `interview-helper-postgres` volume 的安全升级与备份步骤见 [Docker-only 本地 AI](local-ai.md)。升级时绝不能使用 `docker compose down -v`。
 
 只检查 Compose 配置时可以运行：
 
@@ -129,9 +129,15 @@ docker compose logs postgres
 
 确认 `.env` 中开发和测试 URL 分别指向 `interview_helper` 与 `interview_helper_test`。
 
+Docker 的 PostgreSQL 只发布到 IPv4 loopback。示例配置使用 `127.0.0.1`；为了兼容旧的本地 `.env`，local/test 环境中 `localhost` 会由应用安全地归一为 `127.0.0.1`，避免 Windows 优先尝试 `::1` 而耗尽连接超时。
+
 ### 计划或报告一直排队
 
 确认 `python -m app.workers.run` 正在运行，再打开“设置 → 系统诊断”查看 queued、running 和疑似停滞任务数量。诊断包只含状态与计数。
+
+### 语义索引没有立即生效
+
+确认“设置 → 模型与 Agent”已为“向量检索”绑定明确的云端 OpenAI-compatible embedding 模型或已启动的本地 E5/BGE Docker 服务，然后在“语义索引”中点击重建。索引只由 worker 处理；在它完成前或当前题目没有缓存向量时，面试会继续使用全文检索，绝不会在面试回合内等待 embedding 请求。
 
 ### 模型连接测试失败
 

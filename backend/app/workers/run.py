@@ -12,6 +12,7 @@ from app.db.session import dispose_engine
 from app.workers.context_summary_jobs import run_once as run_summary_once
 from app.workers.discovery_jobs import run_once as run_discovery_once
 from app.workers.discovery_retention import run_once as run_discovery_retention_once
+from app.workers.embedding_jobs import run_once as run_embedding_once
 from app.workers.evaluation_jobs import run_once as run_evaluation_once
 from app.workers.heartbeat import (
     WORKER_IDLE,
@@ -75,6 +76,9 @@ async def _run_next_job(worker_id: str, runtime: WorkerRuntime) -> bool:
         ("resume_parse", run_resume_once),
         ("plan_generation", run_plan_once),
         ("question_discovery", run_discovery_once),
+        # Embedding is deliberately last: it is throughput work, and its
+        # runner yields as soon as a live interview is in progress.
+        ("embedding_reindex", run_embedding_once),
     )
     for job_type, runner in runners:
         runtime.state = WORKER_PROCESSING

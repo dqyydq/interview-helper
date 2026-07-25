@@ -1,11 +1,14 @@
 import pytest
 import pytest_asyncio
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import IntegrityError
 
 from app.db.models import SQLModel
-from app.db.models.common import DiscoveryProviderType, DiscoverySourceMode
+from app.db.models.common import (
+    DiscoveryProviderType,
+    DiscoverySourceMode,
+)
 from app.db.models.discovery import (
     DiscoveryConnector,
     QuestionDiscoveryCandidate,
@@ -62,7 +65,17 @@ async def test_all_metadata_tables_exist_in_postgresql() -> None:
         )
 
     assert set(SQLModel.metadata.tables) <= database_tables
-    assert len(SQLModel.metadata.tables) == 43
+    assert len(SQLModel.metadata.tables) == 46
+
+
+@pytest.mark.asyncio
+async def test_pgvector_extension_is_enabled_before_vector_tables() -> None:
+    async with engine.connect() as connection:
+        enabled = await connection.scalar(
+            text("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')")
+        )
+
+    assert enabled is True
 
 
 @pytest.mark.asyncio
@@ -90,9 +103,7 @@ async def test_database_contains_critical_unique_constraints() -> None:
             lambda sync_connection: _unique_names(sync_connection, "question_discovery_sources")
         )
         candidate_constraints = await connection.run_sync(
-            lambda sync_connection: _unique_names(
-                sync_connection, "question_discovery_candidates"
-            )
+            lambda sync_connection: _unique_names(sync_connection, "question_discovery_candidates")
         )
         evidence_constraints = await connection.run_sync(
             lambda sync_connection: _unique_names(
@@ -104,6 +115,9 @@ async def test_database_contains_critical_unique_constraints() -> None:
         )
         provenance_constraints = await connection.run_sync(
             lambda sync_connection: _unique_names(sync_connection, "question_source_provenance")
+        )
+        embedding_profile_constraints = await connection.run_sync(
+            lambda sync_connection: _unique_names(sync_connection, "embedding_profiles")
         )
 
     assert "uq_interview_message_sequence" in message_constraints
@@ -118,6 +132,8 @@ async def test_database_contains_critical_unique_constraints() -> None:
     assert "uq_discovery_import_idempotency_candidate" in import_constraints
     assert "uq_discovery_import_success_candidate_bank" in import_constraints
     assert "uq_question_source_provenance_evidence" in provenance_constraints
+    assert "uq_embedding_profile_active_for_profile" in embedding_profile_constraints
+    assert "uq_embedding_profile_building_for_profile" in embedding_profile_constraints
 
 
 @pytest.mark.asyncio

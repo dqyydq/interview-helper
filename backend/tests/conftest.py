@@ -10,7 +10,7 @@ from alembic import command
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = BACKEND_ROOT.parent
 DEFAULT_TEST_DATABASE_URL = (
-    "postgresql+asyncpg://interview_helper:local-development-only@localhost:5432/"
+    "postgresql+asyncpg://interview_helper:local-development-only@127.0.0.1:5432/"
     "interview_helper_test"
 )
 

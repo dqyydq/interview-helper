@@ -174,6 +174,7 @@ async def build_interviewer_context(
         query=" ".join([current.prompt_snapshot, *(str(item) for item in current.capability_tags)]),
         company_id=config.company_id if config else None,
         role_name=config.role_name if config else None,
+        semantic_plan_question_id=current.id,
         limit=8,
     )
     user_excluded_memory_ids = {

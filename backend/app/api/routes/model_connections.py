@@ -99,6 +99,19 @@ async def update_model_connection(
     return service.to_public(connection)
 
 
+@router.post("/{connection_id}/redact-credentials", response_model=ModelConnectionPublic)
+async def redact_model_connection_credentials(
+    connection_id: uuid.UUID,
+    session: SessionDep,
+) -> ModelConnectionPublic:
+    """Permanently remove an unused connection's stored API credential."""
+
+    profile = await service.ensure_local_profile(session)
+    connection = await service.get_connection(session, profile.id, connection_id)
+    connection = await service.redact_connection_credentials(session, connection)
+    return service.to_public(connection)
+
+
 @router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_model_connection(connection_id: uuid.UUID, session: SessionDep) -> Response:
     profile = await service.ensure_local_profile(session)
