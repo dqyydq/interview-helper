@@ -35,6 +35,10 @@ async function frameMetrics(page: import("@playwright/test").Page) {
   });
 }
 
+async function fontSize(page: import("@playwright/test").Page, selector: string) {
+  return page.locator(selector).evaluate((element) => Math.round(parseFloat(getComputedStyle(element).fontSize)));
+}
+
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/companies", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([company]) }),
@@ -81,6 +85,28 @@ test("keeps primary navigation inside one stable page frame", async ({ page }) =
     expect(metric.minHeight).toBeGreaterThan(0);
     expect(metric.hasHorizontalOverflow).toBe(false);
   }
+});
+
+test("uses the shared typography scale across primary workspaces", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1024 });
+
+  await page.goto("/interviews");
+  await expect(page.locator(".company-rail-heading h1")).toBeVisible();
+  expect(await fontSize(page, '.primary-nav a[href="/interviews"]')).toBe(13);
+  expect(await fontSize(page, ".statusbar")).toBe(12);
+  expect(await fontSize(page, ".company-rail-heading h1")).toBe(18);
+
+  await page.goto("/questions");
+  await expect(page.locator(".knowledge-heading h1")).toBeVisible();
+  expect(await fontSize(page, ".knowledge-heading h1")).toBe(48);
+  expect(await fontSize(page, ".knowledge-tabs button.active")).toBe(14);
+  expect(await fontSize(page, ".search-field input")).toBe(14);
+
+  await page.goto("/reports");
+  await expect(page.locator(".report-index h1")).toBeVisible();
+  expect(await fontSize(page, ".report-index h1")).toBe(48);
+
+  expect((await frameMetrics(page)).hasHorizontalOverflow).toBe(false);
 });
 
 for (const viewportWidth of [320, 375, 414, 768]) {

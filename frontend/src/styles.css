@@ -3,9 +3,9 @@
 :root {
   color: #121821;
   background: #f5f7fa;
-  font-family:
-    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -34,7 +34,10 @@ body {
 }
 
 button,
-a {
+a,
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -83,7 +86,7 @@ a {
   place-items: center;
   color: #0b0f14;
   background: #f6f8fb;
-  font-size: 11px;
+  font-size: var(--text-meta);
   font-weight: 800;
   letter-spacing: -0.04em;
 }
@@ -94,14 +97,14 @@ a {
 }
 
 .brand strong {
-  font-size: 14px;
+  font-size: var(--text-control);
   letter-spacing: 0.055em;
 }
 
 .brand small {
   margin-top: 2px;
   color: #8692a0;
-  font-size: 11px;
+  font-size: var(--text-meta);
 }
 
 .primary-nav {
@@ -139,7 +142,7 @@ a {
 
 .command-trigger span {
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--text-meta);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -150,8 +153,8 @@ a {
   background: #0b0f14;
   border: 1px solid #303a46;
   border-radius: 3px;
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
 }
 
 .command-backdrop {
@@ -181,8 +184,8 @@ a {
   padding: 0 16px;
   color: #667383;
   border-bottom: 1px solid #d2d9e1;
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
   font-weight: 700;
   letter-spacing: 0.14em;
 }
@@ -194,7 +197,7 @@ a {
   border: 1px solid #c8d0d9;
   cursor: pointer;
   font-family: inherit;
-  font-size: 9px;
+  font-size: var(--text-meta);
 }
 
 .command-palette > label {
@@ -260,29 +263,29 @@ a {
 }
 
 .command-results strong {
-  font-size: 14px;
+  font-size: var(--text-control);
 }
 
 .command-results small {
   margin-top: 3px;
   overflow: hidden;
   color: #778391;
-  font-size: 11px;
+  font-size: var(--text-meta);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .command-index {
   color: #8d98a5;
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
 }
 
 .command-results > p {
   margin: 0;
   padding: 36px 20px;
   color: #778391;
-  font-size: 13px;
+  font-size: var(--text-control);
   text-align: center;
 }
 
@@ -294,7 +297,7 @@ a {
   justify-content: center;
   gap: 8px;
   color: #98a3af;
-  font-size: 13px;
+  font-size: var(--text-label);
   text-decoration: none;
   transition: color 160ms ease, background 160ms ease;
 }
@@ -328,7 +331,7 @@ a {
   justify-self: end;
   gap: 8px;
   color: #c4ccd5;
-  font-size: 13px;
+  font-size: var(--text-label);
   text-decoration: none;
 }
 
@@ -1044,8 +1047,8 @@ a {
   color: #727e8c;
   border-top: 1px solid #d7dde5;
   background: #ffffff;
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 10px;
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
   letter-spacing: 0.05em;
 }
 
@@ -6593,4 +6596,226 @@ a {
   .discovery-evidence-list header small {
     grid-column: 2;
   }
+}
+
+/* Product typography contract. These rules deliberately sit after feature
+ * modules so identical content roles keep the same visual weight everywhere. */
+.settings-console :is(p, li, dd),
+.company-console :is(p, li, dd),
+.knowledge-console :is(p, li, dd),
+.interview-setup :is(p, li, dd),
+.live-room :is(p, li, dd),
+.diagnostics-page :is(p, li, dd),
+.discovery-console :is(p, li, dd),
+.empty-state :is(p, li, dd) {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+
+.settings-console :is(small, dt),
+.company-console :is(small, dt),
+.knowledge-console :is(small, dt),
+.interview-setup :is(small, dt),
+.live-room :is(small, dt),
+.diagnostics-page :is(small, dt),
+.discovery-console :is(small, dt),
+.empty-state :is(small, dt) {
+  font-size: var(--text-meta);
+  line-height: var(--leading-control);
+}
+
+.settings-intro h1,
+.knowledge-heading h1,
+.diagnostics-intro h1,
+.discovery-heading h1,
+.report-index h1,
+.report-progress h1 {
+  font-size: var(--text-page-title);
+  font-weight: 700;
+  letter-spacing: var(--tracking-display);
+  line-height: var(--leading-display);
+}
+
+.report-hero h1 {
+  font-size: var(--text-document-title);
+  font-weight: 700;
+  letter-spacing: var(--tracking-display);
+  line-height: var(--leading-display);
+}
+
+.setup-header h1,
+.live-header h1 {
+  font-size: var(--text-section);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: var(--leading-heading);
+}
+
+.settings-intro p:not(.eyebrow),
+.knowledge-heading p,
+.setup-header p,
+.setup-section > div > p,
+.plan-awaiting p,
+.plan-progress p,
+.plan-policy p,
+.live-side p,
+.diagnostics-intro p:last-child,
+.diagnostics-grid > article > p,
+.diagnostics-grid > article > small,
+.diagnostics-grid li,
+.discovery-heading p,
+.discovery-evidence-prompt,
+.discovery-evidence-list blockquote,
+.report-index > header p,
+.report-hero p,
+.report-progress p {
+  font-size: var(--text-body-lg);
+  line-height: var(--leading-body);
+}
+
+.panel-heading h2,
+.company-rail-heading h1,
+.round-workspace-heading h2,
+.preview-heading h2,
+.dialog-heading h2,
+.section-heading h2,
+.question-form h2,
+.resume-toolbar h2,
+.setup-section h2,
+.plan-preview h2,
+.memory-list-heading h2,
+.discovery-rail-heading h2,
+.discovery-form-heading h2,
+.discovery-review-heading h2,
+.discovery-section-heading h3,
+.report-register-row h2,
+.report-overview-column h2,
+.question-review > header h2,
+.practice-plan h2,
+.dimension-matrix h2,
+.report-trend h2,
+.coach-panel h2,
+.evidence-drawer h2 {
+  font-size: var(--text-heading);
+  letter-spacing: -0.015em;
+  line-height: var(--leading-heading);
+}
+
+.round-title-block h3,
+.style-preview h3,
+.console-empty h3,
+.question-variants-heading h3,
+.question-row h3,
+.resume-row h3,
+.source-selector h3,
+.plan-awaiting h3,
+.plan-progress h3,
+.plan-ready section h3,
+.live-side h2,
+.diagnostics-grid > article > strong,
+.question-evaluation-heading h3,
+.practice-plan h3,
+.coach-result h3,
+.discovery-evidence-list header strong {
+  font-size: var(--text-heading-sm);
+  line-height: var(--leading-heading);
+}
+
+.settings-intro .eyebrow,
+.panel-heading span,
+.company-rail-heading span,
+.round-workspace-heading > div > span,
+.preview-heading > span,
+.dialog-heading span,
+.knowledge-heading > div > span,
+.setup-header > div > span,
+.plan-preview-heading span,
+.live-header > div:first-child span,
+.transcript-rule span,
+.live-footer span,
+.diagnostics-actions > span,
+.diagnostics-grid > article > header span,
+.discovery-heading > div > span,
+.discovery-form-heading span,
+.discovery-rail-heading span,
+.discovery-review-heading span,
+.discovery-section-heading span,
+.discovery-import-bar span,
+.discovery-evidence-list header span,
+.discovery-evidence-list header small,
+.report-index > header span,
+.report-hero > div > span,
+.report-outline > span,
+.report-trend > span,
+.coach-panel header span,
+.evidence-drawer header span {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  letter-spacing: var(--tracking-kicker);
+  line-height: var(--leading-control);
+}
+
+.company-option strong,
+.add-company-row,
+.bank-list strong,
+.question-row h3,
+.resume-row h3,
+.setup-command strong,
+.memory-master-switch strong,
+.discovery-run-row strong,
+.discovery-candidate-content h4,
+.discovery-source strong {
+  font-size: var(--text-control);
+  line-height: var(--leading-control);
+}
+
+.company-option small,
+.bank-list small,
+.resume-row small,
+.setup-command small,
+.memory-master-switch small,
+.discovery-run-row small,
+.discovery-candidate-meta,
+.discovery-tag-line,
+.discovery-source small,
+.report-register-row small {
+  font-size: var(--text-meta);
+  line-height: var(--leading-control);
+}
+
+.workspace-frame button,
+.workspace-frame input:not([type="checkbox"]):not([type="radio"]),
+.workspace-frame select {
+  font-size: var(--text-control);
+  line-height: var(--leading-control);
+}
+
+.workspace-frame label {
+  font-size: var(--text-label);
+  line-height: var(--leading-control);
+}
+
+.workspace-frame textarea {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+
+.primary-button,
+.quiet-button,
+.secondary-button,
+.text-button,
+.knowledge-tabs button,
+.settings-tabs a,
+.diagnostics-actions button,
+.voice-controls button,
+.voice-review button,
+.whiteboard-launch,
+.answer-attachment,
+.code-whiteboard button,
+.discovery-mode-switch button,
+.discovery-run-row button,
+.discovery-settings-link {
+  font-size: var(--text-control);
+  line-height: var(--leading-control);
+  white-space: nowrap;
 }

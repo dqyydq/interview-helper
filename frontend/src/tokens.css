@@ -22,9 +22,36 @@
   --color-report-danger-paper: oklch(96% 0.03 28);
   --color-report-backdrop: oklch(16% 0.018 255 / 42%);
 
-  --font-report-display: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-report-body: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-report-mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, monospace;
+  /* Product-wide type roles. Page modules may compose these roles, but do not
+   * invent a separate scale for the same title, body, or control semantics. */
+  --font-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+
+  --text-micro: 0.6875rem;
+  --text-meta: 0.75rem;
+  --text-label: 0.8125rem;
+  --text-control: 0.875rem;
+  --text-body: 0.875rem;
+  --text-body-lg: 0.9375rem;
+  --text-heading-sm: 1rem;
+  --text-heading: 1.125rem;
+  --text-section: 1.375rem;
+  --text-page-title: clamp(2rem, 4vw, 3rem);
+  --text-document-title: clamp(2.25rem, 4vw, 3.25rem);
+
+  --leading-control: 1.35;
+  --leading-heading: 1.25;
+  --leading-display: 1.08;
+  --leading-body: 1.65;
+  --leading-relaxed: 1.75;
+
+  --tracking-display: -0.035em;
+  --tracking-label: 0.08em;
+  --tracking-kicker: 0.12em;
+
+  --font-report-display: var(--font-ui);
+  --font-report-body: var(--font-ui);
+  --font-report-mono: var(--font-mono);
 
   --space-report-1: 0.25rem;
   --space-report-2: 0.5rem;
@@ -50,12 +77,12 @@
     )
   );
 
-  --text-report-xs: 0.6875rem;
-  --text-report-sm: 0.8125rem;
-  --text-report-md: 0.9375rem;
-  --text-report-lg: 1.125rem;
-  --text-report-xl: 1.5rem;
-  --text-report-display: clamp(2rem, 4vw, 3.75rem);
+  --text-report-xs: var(--text-micro);
+  --text-report-sm: var(--text-label);
+  --text-report-md: var(--text-body-lg);
+  --text-report-lg: var(--text-heading);
+  --text-report-xl: var(--text-section);
+  --text-report-display: var(--text-document-title);
 
   --ease-report-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-report-in: cubic-bezier(0.7, 0, 0.84, 0);
