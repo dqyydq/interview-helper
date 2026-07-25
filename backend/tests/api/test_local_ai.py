@@ -37,8 +37,13 @@ async def test_local_ai_preset_catalog_is_public_and_static() -> None:
 async def test_local_ai_capabilities_use_fixed_catalog_and_bounded_probes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_probe_all(*, timeout_seconds: float) -> list[LocalAiCapability]:
+    async def fake_probe_all(
+        *,
+        timeout_seconds: float,
+        cache_seconds: float,
+    ) -> list[LocalAiCapability]:
         assert timeout_seconds > 0
+        assert cache_seconds >= 0
         return [
             LocalAiCapability(
                 key="sensevoice-small",

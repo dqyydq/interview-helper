@@ -6,7 +6,11 @@ from app.core.config import settings
 from app.local_ai.capabilities import get_local_capability
 from app.local_ai.catalog import get_local_ai_preset_catalog
 from app.local_ai.docker import collect_docker_diagnostics
-from app.local_ai.probes import probe_all_local_capabilities, probe_local_capability
+from app.local_ai.probes import (
+    invalidate_local_capability_probe_cache,
+    probe_all_local_capabilities,
+    probe_local_capability,
+)
 from app.schemas.local_ai import LocalAiCapability, LocalAiDockerDiagnostics, LocalAiPresetCatalog
 
 router = APIRouter(prefix="/local-ai", tags=["local-ai"])
@@ -24,7 +28,8 @@ async def list_local_ai_capabilities() -> list[LocalAiCapability]:
     """Return fixed local capability cards and bounded loopback probe status."""
 
     return await probe_all_local_capabilities(
-        timeout_seconds=settings.local_ai_service_probe_timeout_seconds
+        timeout_seconds=settings.local_ai_service_probe_timeout_seconds,
+        cache_seconds=settings.local_ai_service_probe_cache_seconds,
     )
 
 
@@ -37,10 +42,12 @@ async def test_local_ai_capability(capability_key: str) -> LocalAiCapability:
             message="本地能力不存在",
             status_code=404,
         )
-    return await probe_local_capability(
+    result = await probe_local_capability(
         capability,
         timeout_seconds=settings.local_ai_service_probe_timeout_seconds,
     )
+    invalidate_local_capability_probe_cache()
+    return result
 
 
 @router.get("/docker-diagnostics", response_model=LocalAiDockerDiagnostics)

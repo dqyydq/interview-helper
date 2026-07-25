@@ -278,6 +278,29 @@ async def bind_role(
     return binding
 
 
+async def unbind_role(
+    session: AsyncSession,
+    profile_id: uuid.UUID,
+    role: ModelRole,
+) -> bool:
+    """Remove one explicit role target without affecting the underlying connection.
+
+    A role binding is routing metadata, not user-owned model configuration.  In
+    particular, this lets a Docker-only user safely clear a local capability
+    before switching runtimes or rolling back its migration.
+    """
+
+    result = await session.execute(
+        delete(ModelRoleBinding).where(
+            ModelRoleBinding.profile_id == profile_id,
+            ModelRoleBinding.role == role,
+            ModelRoleBinding.deleted_at.is_(None),
+        )
+    )
+    await session.commit()
+    return bool(result.rowcount)
+
+
 async def resolve_local_or_connection_target(
     session: AsyncSession,
     profile_id: uuid.UUID,

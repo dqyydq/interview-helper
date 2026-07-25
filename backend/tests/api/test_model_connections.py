@@ -273,3 +273,22 @@ async def test_local_capability_binding_has_no_fake_connection_or_api_key() -> N
     assert binding is not None
     assert binding.connection_id is None
     assert binding.local_capability_key == "sensevoice-small"
+
+
+@pytest.mark.asyncio
+async def test_role_binding_can_be_cleared_without_deleting_its_connection() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        bound = await client.put(
+            "/api/model-connections/roles/transcriber",
+            json={"local_capability_key": "sensevoice-small"},
+        )
+        cleared = await client.delete("/api/model-connections/roles/transcriber")
+        bindings = await client.get("/api/model-connections/roles")
+
+    assert bound.status_code == 200
+    assert cleared.status_code == 204
+    assert bindings.status_code == 200
+    assert bindings.json() == []

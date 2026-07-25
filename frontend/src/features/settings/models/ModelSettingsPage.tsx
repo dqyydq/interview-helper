@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Check,
   Cpu,
+  LoaderCircle,
   Play,
   Plus,
   ShieldCheck,
@@ -47,6 +48,8 @@ const initialDraft: ConnectionDraft = {
   supports_token_count_endpoint: false,
 };
 
+const sharedEmbeddingEndpointKeys = new Set(["multilingual-e5-small", "bge-m3"]);
+
 function statusLabel(status: ModelConnection["status"]) {
   return {
     untested: "未测试",
@@ -56,18 +59,81 @@ function statusLabel(status: ModelConnection["status"]) {
   }[status];
 }
 
-function localStatusLabel(status: LocalCapability["status"]) {
+type LocalCapabilityDisplayStatus = LocalCapability["status"] | "inactive_alternative";
+
+interface LocalCapabilityPresentation {
+  displayStatus: LocalCapabilityDisplayStatus;
+  compactStatus: string;
+  detail: string;
+  action: string;
+  optionStatus: string;
+}
+
+function localLatencyLabel(capability: LocalCapability) {
+  return capability.latency_ms === null ? null : `${capability.latency_ms} ms`;
+}
+
+function getLocalCapabilityPresentation(
+  capability: LocalCapability,
+  capabilities: LocalCapability[] | undefined,
+): LocalCapabilityPresentation {
+  const readyAlternative = capabilities?.find(
+    (candidate) =>
+      candidate.key !== capability.key
+      && candidate.role === "embedding"
+      && sharedEmbeddingEndpointKeys.has(candidate.key)
+      && candidate.status === "ready",
+  );
+
+  if (
+    capability.role === "embedding"
+    && capability.status === "mismatch"
+    && sharedEmbeddingEndpointKeys.has(capability.key)
+    && readyAlternative
+  ) {
+    return {
+      displayStatus: "inactive_alternative",
+      compactStatus: `当前未启用（${readyAlternative.title} 已就绪）`,
+      detail: `与“${readyAlternative.title}”共用本机嵌入服务端口；一次只能运行一种嵌入模型。`,
+      action: `如要切换，停止 ${readyAlternative.compose_profile} 后启动 ${capability.compose_profile}，再检查。`,
+      optionStatus: "当前未启用（先切换 Docker profile）",
+    };
+  }
+
+  if (capability.status === "ready") {
+    return {
+      displayStatus: "ready",
+      compactStatus: "服务已就绪",
+      detail: capability.summary,
+      action: "可以直接绑定到对应 Agent 角色。",
+      optionStatus: "已就绪",
+    };
+  }
+
+  if (capability.status === "unavailable") {
+    return {
+      displayStatus: "unavailable",
+      compactStatus: "待配置",
+      detail: "Docker 本地服务尚未启动或当前不可达。",
+      action: `可先绑定为预配置；启动 ${capability.compose_profile} 后再检查即可生效。`,
+      optionStatus: "待配置（先启动 Docker）",
+    };
+  }
+
   return {
-    ready: "本地服务已就绪",
-    unavailable: "服务未启动或不可达",
-    mismatch: "运行中的模型不匹配",
-  }[status];
+    displayStatus: "mismatch",
+    compactStatus: "模型校验未通过",
+    detail: "本地服务能够响应，但返回的模型或向量维度与此能力不一致。",
+    action: `停止当前容器，确认后启动 ${capability.compose_profile}，再重新检查。`,
+    optionStatus: "模型不匹配（请修正服务）",
+  };
 }
 
 export function ModelSettingsPage() {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(initialDraft);
   const [formOpen, setFormOpen] = useState(false);
+  const [checkingCapabilityKey, setCheckingCapabilityKey] = useState<string | null>(null);
 
   const connections = useQuery({ queryKey: ["model-connections"], queryFn: modelConnectionApi.list });
   const bindings = useQuery({ queryKey: ["model-bindings"], queryFn: modelConnectionApi.listBindings });
@@ -107,10 +173,20 @@ export function ModelSettingsPage() {
       modelConnectionApi.bindRole(role, target),
     onSuccess: refresh,
   });
+  const unbindRole = useMutation({
+    mutationFn: modelConnectionApi.unbindRole,
+    onSuccess: refresh,
+  });
   const testLocalCapability = useMutation({
     mutationFn: modelConnectionApi.testLocalCapability,
+    onMutate: (key) => {
+      setCheckingCapabilityKey(key);
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["local-ai-capabilities"] });
+    },
+    onSettled: () => {
+      setCheckingCapabilityKey(null);
     },
   });
 
@@ -136,6 +212,7 @@ export function ModelSettingsPage() {
     readiness.error,
     localCapabilities.error,
     createConnection.error,
+    unbindRole.error,
     testLocalCapability.error,
   ].find(
     (item) => item instanceof Error,
@@ -335,30 +412,65 @@ export function ModelSettingsPage() {
             <p className="routing-note">
               先在终端安装已校验模型并启动对应 Docker profile；这里只检查固定的 loopback 服务，既不需要 API Key，也不会自动下载或启动容器。
             </p>
-            {localCapabilities.data?.map((capability) => (
-              <article className="connection-row" key={capability.key}>
-                <span className="provider-glyph"><Cpu size={18} aria-hidden="true" /></span>
-                <div className="connection-identity">
-                  <strong>{capability.title}</strong>
-                  <span>{capability.compose_profile} · {capability.model_name}</span>
-                </div>
-                <span className="protocol-label">{capability.runtime.toUpperCase()}</span>
-                <span className={`connection-status ${capability.status}`}>
-                  {capability.status === "ready" && <Check size={13} aria-hidden="true" />}
-                  {localStatusLabel(capability.status)}
-                </span>
-                <div className="row-actions">
-                  <button
-                    type="button"
-                    aria-label={`检查 ${capability.title}`}
-                    disabled={testLocalCapability.isPending}
-                    onClick={() => testLocalCapability.mutate(capability.key)}
+            {localCapabilities.data?.map((capability) => {
+              const presentation = getLocalCapabilityPresentation(capability, localCapabilities.data);
+              const latency = localLatencyLabel(capability);
+              const isChecking = testLocalCapability.isPending
+                && checkingCapabilityKey === capability.key;
+              const visibleStatus = isChecking ? "正在检查本地服务…" : presentation.compactStatus;
+              return (
+                <article
+                  className={`connection-row local-capability-card ${presentation.displayStatus}`}
+                  key={capability.key}
+                >
+                  <span className="provider-glyph"><Cpu size={18} aria-hidden="true" /></span>
+                  <div className="connection-identity local-capability-identity">
+                    <strong>{capability.title}</strong>
+                    <span>{capability.compose_profile} · {capability.model_name}</span>
+                    <span className={`local-card-mobile-status ${presentation.displayStatus}`}>
+                      {visibleStatus}{latency && !isChecking ? ` · ${latency}` : ""}
+                    </span>
+                  </div>
+                  <span className="protocol-label">{capability.runtime.toUpperCase()}</span>
+                  <span className={`connection-status ${presentation.displayStatus}`} aria-hidden="true">
+                    {capability.status === "ready" && !isChecking && <Check size={13} aria-hidden="true" />}
+                    {isChecking && <LoaderCircle className="local-capability-spinner" size={13} aria-hidden="true" />}
+                    {visibleStatus}{latency && !isChecking ? ` · ${latency}` : ""}
+                  </span>
+                  <div className="row-actions">
+                    <button
+                      type="button"
+                      aria-busy={isChecking}
+                      aria-label={isChecking ? `正在检查 ${capability.title}` : `检查 ${capability.title}`}
+                      disabled={isChecking}
+                      onClick={() => testLocalCapability.mutate(capability.key)}
+                    >
+                      {isChecking ? (
+                        <LoaderCircle className="local-capability-spinner" size={15} aria-hidden="true" />
+                      ) : (
+                        <Play size={15} aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
+                  <p
+                    className={`local-capability-feedback ${presentation.displayStatus}`}
+                    role="status"
+                    aria-atomic="true"
+                    aria-live="polite"
                   >
-                    <Play size={15} aria-hidden="true" />
-                  </button>
-                </div>
-              </article>
-            ))}
+                    <strong>
+                      {isChecking ? "正在检查…" : visibleStatus}
+                      {latency && !isChecking ? ` · ${latency}` : ""}
+                    </strong>
+                    <span>
+                      {isChecking
+                        ? "正在验证固定的本机服务地址；检查不会启动容器、下载模型或改动当前配置。"
+                        : `${presentation.detail} ${presentation.action}`}
+                    </span>
+                  </p>
+                </article>
+              );
+            })}
             {!localCapabilities.isLoading && !localCapabilities.data?.length && (
               <div className="connection-empty">本地 Docker 能力目录暂不可用。</div>
             )}
@@ -386,43 +498,66 @@ export function ModelSettingsPage() {
               const selectedTarget = binding?.target_kind === "local_capability"
                 ? `local:${binding.local_capability_key}`
                 : binding?.connection_id ?? "";
+              const selectedLocalCapability = binding?.target_kind === "local_capability"
+                ? localRoleCapabilities?.find((item) => item.key === binding.local_capability_key)
+                : undefined;
+              const selectedLocalPresentation = selectedLocalCapability
+                ? getLocalCapabilityPresentation(selectedLocalCapability, localCapabilities.data)
+                : undefined;
+              const isLocalPreconfiguration = selectedLocalPresentation
+                && selectedLocalPresentation.displayStatus !== "ready";
               return (
                 <label className="role-row" key={role}>
                   <span>
                     <strong>{roleLabels[role]}</strong>
                     <small>{required ? "REQUIRED" : "OPTIONAL"}</small>
                   </span>
-                  <select
-                    aria-label={`${roleLabels[role]}模型`}
-                    value={selectedTarget}
-                    onChange={(event) => {
-                      const target = event.target.value;
-                      if (target.startsWith("local:")) {
-                        bindRole.mutate({
-                          role,
-                          target: { local_capability_key: target.slice("local:".length) },
-                        });
-                      } else if (target) {
-                        bindRole.mutate({ role, target: { connection_id: target } });
-                      }
-                    }}
-                  >
-                    <option value="">{required ? "请选择连接" : "使用回退策略"}</option>
-                    {roleConnections?.map((connection) => (
-                      <option key={connection.id} value={connection.id}>
-                        {connection.name} · {connection.model_name}
-                      </option>
-                    ))}
-                    {!!localRoleCapabilities?.length && (
-                      <optgroup label="本地 Docker">
-                        {localRoleCapabilities.map((capability) => (
-                          <option key={capability.key} value={`local:${capability.key}`}>
-                            {capability.title} · {localStatusLabel(capability.status)}
-                          </option>
-                        ))}
-                      </optgroup>
+                  <span className="role-target-control">
+                    <select
+                      aria-label={`${roleLabels[role]}模型`}
+                      value={selectedTarget}
+                      onChange={(event) => {
+                        const target = event.target.value;
+                        if (target.startsWith("local:")) {
+                          bindRole.mutate({
+                            role,
+                            target: { local_capability_key: target.slice("local:".length) },
+                          });
+                        } else if (target) {
+                          bindRole.mutate({ role, target: { connection_id: target } });
+                        } else {
+                          unbindRole.mutate(role);
+                        }
+                      }}
+                    >
+                      <option value="">{required ? "请选择连接" : "使用回退策略"}</option>
+                      {roleConnections?.map((connection) => (
+                        <option key={connection.id} value={connection.id}>
+                          {connection.name} · {connection.model_name}
+                        </option>
+                      ))}
+                      {!!localRoleCapabilities?.length && (
+                        <optgroup label="本地 Docker（可先绑定，启动后生效）">
+                          {localRoleCapabilities.map((capability) => {
+                            const presentation = getLocalCapabilityPresentation(
+                              capability,
+                              localCapabilities.data,
+                            );
+                            return (
+                              <option key={capability.key} value={`local:${capability.key}`}>
+                                {capability.title} · {presentation.optionStatus}
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                      )}
+                    </select>
+                    {isLocalPreconfiguration && (
+                      <small className="role-preconfiguration">
+                        已保存为预配置：{selectedLocalPresentation.compactStatus}。服务就绪前不会自动改用云端模型。
+                      </small>
                     )}
-                  </select>
+                  </span>
                 </label>
               );
             })}

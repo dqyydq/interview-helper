@@ -7,9 +7,11 @@ from app.api.errors import AppError
 from app.core.config import settings
 from app.db.models.common import ProviderType
 from app.local_ai.capabilities import LocalCapabilityDefinition
+from app.local_ai.probes import probe_local_capability
 from app.providers.factory import build_transcription_provider
 from app.providers.openai_transcription import OpenAICompatibleTranscriptionProvider
 from app.providers.speech_base import TranscriptionRequest, TranscriptionResult
+from app.schemas.local_ai import LocalAiCapabilityStatus
 from app.services import model_connections
 
 router = APIRouter(prefix="/transcriptions", tags=["transcriptions"])
@@ -24,6 +26,41 @@ ALLOWED_AUDIO_TYPES = {
     "audio/x-wav",
     "video/webm",
 }
+
+
+async def _require_ready_local_transcriber(
+    capability: LocalCapabilityDefinition,
+) -> None:
+    """Refuse transcription unless the fixed SenseVoice service proves its identity.
+
+    A local role binding is configuration only: it does not prove that the
+    process currently listening on the loopback port is this application's
+    expected FunASR/SenseVoice container.  Probe the health endpoint on every
+    request, then require its ready state, model name, and immutable revision
+    before sending user audio.  There is intentionally no cloud fallback here.
+    """
+
+    health = await probe_local_capability(
+        capability,
+        timeout_seconds=settings.local_ai_service_probe_timeout_seconds,
+    )
+    if health.status == LocalAiCapabilityStatus.READY:
+        return
+    if health.status == LocalAiCapabilityStatus.MISMATCH:
+        raise AppError(
+            code="local_transcription_service_mismatch",
+            message=(
+                "本地 SenseVoice 服务身份不匹配，请使用本应用的 Docker 配置重启服务后重试。"
+            ),
+            status_code=503,
+            retryable=True,
+        )
+    raise AppError(
+        code="local_transcription_service_unavailable",
+        message="本地 SenseVoice 服务暂不可用，请确认 Docker 服务已启动后重试。",
+        status_code=503,
+        retryable=True,
+    )
 
 
 @router.post("", response_model=TranscriptionResult)
@@ -62,6 +99,7 @@ async def create_transcription(
             status_code=409,
         ) from exc
     if isinstance(target, LocalCapabilityDefinition):
+        await _require_ready_local_transcriber(target)
         provider = OpenAICompatibleTranscriptionProvider(
             base_url=target.base_url,
             api_key=None,

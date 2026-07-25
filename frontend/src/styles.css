@@ -708,6 +708,91 @@ a {
   margin: 0 0 14px;
 }
 
+.local-capability-card {
+  min-height: 0;
+  align-items: start;
+  padding: 15px 0 16px;
+}
+
+.local-capability-card .provider-glyph {
+  margin-top: 2px;
+}
+
+.local-capability-card .connection-status {
+  min-width: 0;
+  align-self: center;
+  line-height: 1.45;
+}
+
+.local-capability-card .connection-status.ready {
+  color: #147654;
+}
+
+.local-capability-card .connection-status.unavailable {
+  color: #94611b;
+}
+
+.local-capability-card .connection-status.mismatch {
+  color: #a43d31;
+}
+
+.local-capability-card .connection-status.inactive_alternative {
+  color: #526f9f;
+}
+
+.local-card-mobile-status {
+  display: none;
+}
+
+.local-capability-feedback {
+  grid-column: 2 / -1;
+  display: grid;
+  gap: 4px;
+  margin: -1px 0 0;
+  padding-top: 11px;
+  color: #697786;
+  border-top: 1px solid #e0e5eb;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.local-capability-feedback strong {
+  color: #3f4c59;
+  font-size: 10px;
+}
+
+.local-capability-feedback.ready strong {
+  color: #147654;
+}
+
+.local-capability-feedback.unavailable strong {
+  color: #875b17;
+}
+
+.local-capability-feedback.mismatch strong {
+  color: #a43d31;
+}
+
+.local-capability-feedback.inactive_alternative strong {
+  color: #365f9e;
+}
+
+.local-capability-spinner {
+  animation: local-capability-spin 900ms linear infinite;
+}
+
+@keyframes local-capability-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .local-capability-spinner {
+    animation: none;
+  }
+}
+
 .connection-row {
   display: grid;
   grid-template-columns: 38px minmax(150px, 1fr) 86px 104px 70px;
@@ -834,6 +919,21 @@ a {
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 8px;
   letter-spacing: 0.08em;
+}
+
+.role-target-control {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.role-preconfiguration {
+  margin: 0 !important;
+  color: #875b17 !important;
+  font-family: inherit !important;
+  font-size: 9px !important;
+  letter-spacing: 0 !important;
+  line-height: 1.55;
 }
 
 .statusbar {
@@ -3543,6 +3643,56 @@ a {
   .protocol-label,
   .connection-status {
     display: none;
+  }
+
+  .local-capability-card {
+    grid-template-columns: 38px minmax(0, 1fr) 64px;
+  }
+
+  .local-capability-card .local-card-mobile-status {
+    display: inline-flex;
+    width: fit-content;
+    max-width: 100%;
+    margin-top: 7px;
+    padding: 3px 6px;
+    color: #687482;
+    border: 1px solid #ccd4dc;
+    background: #f7f9fb;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 8px;
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+    white-space: normal;
+  }
+
+  .local-capability-card .local-card-mobile-status.ready {
+    color: #147654;
+    border-color: #b8d8c8;
+    background: #f1faf5;
+  }
+
+  .local-capability-card .local-card-mobile-status.unavailable {
+    color: #875b17;
+    border-color: #e6d1ac;
+    background: #fffaf0;
+  }
+
+  .local-capability-card .local-card-mobile-status.mismatch {
+    color: #a43d31;
+    border-color: #e7c1bb;
+    background: #fff5f3;
+  }
+
+  .local-capability-card .local-card-mobile-status.inactive_alternative {
+    color: #365f9e;
+    border-color: #c4d5ee;
+    background: #f2f6fc;
+  }
+
+  .local-capability-card .local-capability-feedback {
+    grid-column: 1 / -1;
+    margin-top: 3px;
+    padding-top: 10px;
   }
 
   .role-row {

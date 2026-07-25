@@ -62,6 +62,15 @@ async def update_role_binding(
     return next(item for item in bindings if item.id == binding.id)
 
 
+@router.delete("/roles/{role}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_role_binding(role: ModelRole, session: SessionDep) -> Response:
+    """Clear an explicit role target while retaining any saved model connection."""
+
+    profile = await service.ensure_local_profile(session)
+    await service.unbind_role(session, profile.id, role)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/readiness", response_model=ModelReadiness)
 async def get_model_readiness(session: SessionDep) -> ModelReadiness:
     profile = await service.ensure_local_profile(session)

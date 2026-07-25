@@ -29,6 +29,8 @@ export const modelConnectionApi = {
       method: "PUT",
       body: JSON.stringify(target),
     }),
+  unbindRole: (role: ModelRole) =>
+    apiRequest<void>(`/model-connections/roles/${role}`, { method: "DELETE" }),
   readiness: () => apiRequest<ModelReadiness>("/model-connections/readiness"),
   listLocalCapabilities: () => apiRequest<LocalCapability[]>("/local-ai/capabilities"),
   testLocalCapability: (key: string) =>

@@ -9,9 +9,14 @@ import httpx
 
 from app.db.models.common import ModelRole
 from app.local_ai.capabilities import LOCAL_CAPABILITIES, LocalCapabilityDefinition
+from app.providers.base import ProviderError
+from app.providers.http import elapsed_ms
 from app.providers.openai_embedding import OpenAICompatibleEmbeddingProvider
-from app.providers.types import ProviderHealthStatus
+from app.providers.types import EmbeddingRequest, ProviderHealthStatus
 from app.schemas.local_ai import LocalAiCapability, LocalAiCapabilityStatus
+
+_capability_cache: tuple[float, tuple[LocalAiCapability, ...]] | None = None
+_capability_probe_task: asyncio.Task[tuple[LocalAiCapability, ...]] | None = None
 
 
 def _latency_ms(started_at: float) -> int:
@@ -66,7 +71,7 @@ async def probe_local_capability(
             health = await provider.health_check()
         finally:
             await provider.aclose()
-        if health.status is ProviderHealthStatus.HEALTHY:
+        if health.status == ProviderHealthStatus.HEALTHY:
             status = LocalAiCapabilityStatus.READY
         elif health.error_code == "provider_invalid_response":
             status = LocalAiCapabilityStatus.MISMATCH
@@ -130,12 +135,126 @@ async def probe_local_capability(
     )
 
 
-async def probe_all_local_capabilities(*, timeout_seconds: float) -> list[LocalAiCapability]:
-    return list(
-        await asyncio.gather(
+async def _probe_embedding_endpoint(
+    capability: LocalCapabilityDefinition,
+    *,
+    timeout_seconds: float,
+) -> tuple[int | None, int | None, str | None]:
+    """Probe a shared TEI endpoint once and return its observed vector size.
+
+    E5 and BGE-M3 intentionally share one port and can never both be running.
+    Their bulk settings status should therefore perform one tiny inference, not
+    two competing ones.  The returned dimension identifies which preset owns
+    the endpoint.
+    """
+
+    started_at = time.perf_counter()
+    provider = OpenAICompatibleEmbeddingProvider(
+        base_url=capability.base_url,
+        api_key=None,
+        model=capability.model_name,
+        timeout_seconds=timeout_seconds,
+    )
+    try:
+        response = await provider.embed(EmbeddingRequest(texts=["health check"]))
+    except ProviderError as exc:
+        return None, elapsed_ms(started_at), exc.code
+    finally:
+        await provider.aclose()
+    return len(response.vectors[0]), elapsed_ms(started_at), None
+
+
+async def _probe_all_uncached(*, timeout_seconds: float) -> tuple[LocalAiCapability, ...]:
+    embedding_capabilities = tuple(
+        capability for capability in LOCAL_CAPABILITIES if capability.role == ModelRole.EMBEDDING
+    )
+    other_capabilities = tuple(
+        capability for capability in LOCAL_CAPABILITIES if capability.role != ModelRole.EMBEDDING
+    )
+
+    async def probe_embedding_group() -> dict[str, LocalAiCapability]:
+        if not embedding_capabilities:
+            return {}
+        dimensions, latency_ms, error_code = await _probe_embedding_endpoint(
+            embedding_capabilities[0],
+            timeout_seconds=timeout_seconds,
+        )
+        results: dict[str, LocalAiCapability] = {}
+        for capability in embedding_capabilities:
+            if dimensions is None:
+                status = (
+                    LocalAiCapabilityStatus.MISMATCH
+                    if error_code == "provider_invalid_response"
+                    else LocalAiCapabilityStatus.UNAVAILABLE
+                )
+                results[capability.key] = _public(
+                    capability,
+                    status=status,
+                    latency_ms=latency_ms,
+                    error_code=error_code,
+                )
+                continue
+            if dimensions == capability.vector_dimensions:
+                results[capability.key] = _public(
+                    capability,
+                    status=LocalAiCapabilityStatus.READY,
+                    latency_ms=latency_ms,
+                    error_code=None,
+                )
+            else:
+                results[capability.key] = _public(
+                    capability,
+                    status=LocalAiCapabilityStatus.MISMATCH,
+                    latency_ms=latency_ms,
+                    error_code="embedding_dimension_mismatch",
+                )
+        return results
+
+    other_results, embedding_results = await asyncio.gather(
+        asyncio.gather(
             *(
                 probe_local_capability(capability, timeout_seconds=timeout_seconds)
-                for capability in LOCAL_CAPABILITIES
+                for capability in other_capabilities
             )
-        )
+        ),
+        probe_embedding_group(),
     )
+    results_by_key = {result.key: result for result in other_results}
+    results_by_key.update(embedding_results)
+    return tuple(results_by_key[capability.key] for capability in LOCAL_CAPABILITIES)
+
+
+def invalidate_local_capability_probe_cache() -> None:
+    """Forget only UI status; this never stops, starts, or reconfigures Docker."""
+
+    global _capability_cache
+    _capability_cache = None
+
+
+async def probe_all_local_capabilities(
+    *,
+    timeout_seconds: float,
+    cache_seconds: float,
+) -> list[LocalAiCapability]:
+    """Return a short-lived, single-flight local capability status snapshot."""
+
+    global _capability_cache, _capability_probe_task
+    now = time.monotonic()
+    if (
+        cache_seconds > 0
+        and _capability_cache
+        and now - _capability_cache[0] <= cache_seconds
+    ):
+        return list(_capability_cache[1])
+
+    task = _capability_probe_task
+    if task is None or task.done():
+        task = asyncio.create_task(_probe_all_uncached(timeout_seconds=timeout_seconds))
+        _capability_probe_task = task
+    try:
+        results = await asyncio.shield(task)
+    finally:
+        if task.done() and _capability_probe_task is task:
+            _capability_probe_task = None
+    _capability_cache = (time.monotonic(), results)
+    return list(results)

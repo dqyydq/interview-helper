@@ -42,14 +42,23 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    local_binding_count = bind.execute(
-        sa.text("SELECT count(*) FROM model_role_bindings WHERE local_capability_key IS NOT NULL")
-    ).scalar_one()
-    if local_binding_count:
-        raise RuntimeError(
-            "Remove local capability bindings before downgrading migration 0007."
-        )
+    # Keep the protection in SQL so ``alembic downgrade --sql`` stays usable
+    # and an accidental online downgrade cannot silently discard local routes.
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM model_role_bindings
+                WHERE local_capability_key IS NOT NULL
+            ) THEN
+                RAISE EXCEPTION 'Remove local capability bindings before downgrading migration 0007.';
+            END IF;
+        END;
+        $$
+        """
+    )
     op.drop_constraint(
         "ck_model_role_binding_local_capability_role",
         "model_role_bindings",
