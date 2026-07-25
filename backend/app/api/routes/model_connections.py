@@ -48,8 +48,16 @@ async def update_role_binding(
     session: SessionDep,
 ) -> RoleBindingPublic:
     profile = await service.ensure_local_profile(session)
-    connection = await service.get_connection(session, profile.id, payload.connection_id)
-    binding = await service.bind_role(session, profile.id, role, connection)
+    if payload.connection_id is not None:
+        connection = await service.get_connection(session, profile.id, payload.connection_id)
+        binding = await service.bind_role(session, profile.id, role, connection=connection)
+    else:
+        binding = await service.bind_role(
+            session,
+            profile.id,
+            role,
+            local_capability_key=payload.local_capability_key,
+        )
     bindings = await service.list_bindings(session, profile.id)
     return next(item for item in bindings if item.id == binding.id)
 

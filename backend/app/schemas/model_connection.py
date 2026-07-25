@@ -1,6 +1,7 @@
 import uuid
+from typing import Literal
 
-from pydantic import AnyHttpUrl, Field, field_validator
+from pydantic import AnyHttpUrl, Field, field_validator, model_validator
 
 from app.db.models.common import ConnectionStatus, ModelRole, ProviderType
 from app.schemas.common import ApiModel, EntityPublic
@@ -90,15 +91,24 @@ class ConnectionTestResult(ApiModel):
 
 
 class RoleBindingUpdate(ApiModel):
-    connection_id: uuid.UUID
+    connection_id: uuid.UUID | None = None
+    local_capability_key: str | None = Field(default=None, min_length=1, max_length=80)
+
+    @model_validator(mode="after")
+    def validate_one_target(self) -> "RoleBindingUpdate":
+        if (self.connection_id is None) == (self.local_capability_key is None):
+            raise ValueError("必须且只能选择一个模型连接或本地能力")
+        return self
 
 
 class RoleBindingPublic(EntityPublic):
     role: ModelRole
-    connection_id: uuid.UUID
-    connection_name: str
-    model_name: str
-    connection_status: ConnectionStatus
+    target_kind: Literal["model_connection", "local_capability"]
+    connection_id: uuid.UUID | None = None
+    connection_name: str | None = None
+    model_name: str | None = None
+    connection_status: ConnectionStatus | None = None
+    local_capability_key: str | None = None
 
 
 class ModelReadiness(ApiModel):

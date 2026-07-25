@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     worker_heartbeat_stale_after_seconds: float = Field(default=15.0, ge=1.0, le=600.0)
     local_ai_docker_diagnostics_timeout_seconds: float = Field(default=2.0, ge=0.1, le=10.0)
     local_ai_docker_diagnostics_cache_seconds: float = Field(default=5.0, ge=0.0, le=60.0)
+    local_ai_service_probe_timeout_seconds: float = Field(default=2.5, ge=0.1, le=10.0)
+    local_asr_port: int = Field(default=8011, ge=1, le=65_535)
+    local_asr_request_timeout_seconds: float = Field(default=150.0, ge=5.0, le=300.0)
+    local_embeddings_port: int = Field(default=8081, ge=1, le=65_535)
     discovery_allow_http_local: bool = False
     discovery_request_timeout_seconds: float = Field(default=15.0, ge=1.0, le=15.0)
     discovery_run_timeout_seconds: float = Field(default=60.0, ge=5.0, le=60.0)

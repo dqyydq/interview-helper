@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from app.db.models.common import ModelRole
 from app.schemas.common import ApiModel
 
 
@@ -24,6 +25,27 @@ class LocalAiPreset(ApiModel):
 class LocalAiPresetCatalog(ApiModel):
     catalog_version: int = Field(ge=1)
     presets: list[LocalAiPreset]
+
+
+class LocalAiCapabilityStatus(StrEnum):
+    READY = "ready"
+    UNAVAILABLE = "unavailable"
+    MISMATCH = "mismatch"
+
+
+class LocalAiCapability(ApiModel):
+    key: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,79}$")
+    role: ModelRole
+    title: str = Field(min_length=1, max_length=100)
+    summary: str = Field(min_length=1, max_length=240)
+    runtime: str = Field(min_length=1, max_length=40)
+    compose_profile: str = Field(min_length=1, max_length=80)
+    model_name: str = Field(min_length=1, max_length=255)
+    revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    vector_dimensions: int | None = Field(default=None, ge=1, le=4_096)
+    status: LocalAiCapabilityStatus
+    latency_ms: int | None = Field(default=None, ge=0)
+    error_code: str | None = Field(default=None, max_length=100)
 
 
 class DockerComponentState(StrEnum):

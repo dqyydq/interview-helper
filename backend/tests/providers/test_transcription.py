@@ -72,6 +72,30 @@ async def test_transcription_errors_are_sanitized() -> None:
     assert "provider detail" not in str(exc_info.value)
 
 
+@pytest.mark.asyncio
+async def test_loopback_transcription_omits_authorization_when_no_key_is_needed() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert "authorization" not in request.headers
+        return httpx.Response(200, json={"text": "本地转写"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OpenAICompatibleTranscriptionProvider(
+            base_url="http://127.0.0.1:8011/v1",
+            api_key=None,
+            model="sensevoice-small",
+            client=client,
+        )
+        result = await provider.transcribe(
+            TranscriptionRequest(
+                audio=b"audio",
+                filename="answer.webm",
+                content_type="audio/webm",
+            )
+        )
+
+    assert result.text == "本地转写"
+
+
 def test_anthropic_connection_cannot_be_built_as_transcription_provider() -> None:
     connection = ModelConnection(
         profile_id="00000000-0000-0000-0000-000000000001",

@@ -15,6 +15,8 @@ vi.mock("./api", () => ({
     listBindings: vi.fn(),
     bindRole: vi.fn(),
     readiness: vi.fn(),
+    listLocalCapabilities: vi.fn(),
+    testLocalCapability: vi.fn(),
   },
 }));
 
@@ -38,6 +40,7 @@ describe("ModelSettingsPage", () => {
       missing_roles: ["interviewer", "evaluator"],
       degraded_roles: [],
     });
+    vi.mocked(modelConnectionApi.listLocalCapabilities).mockResolvedValue([]);
     vi.mocked(modelConnectionApi.create).mockResolvedValue({
       id: "connection-1",
       name: "主模型",

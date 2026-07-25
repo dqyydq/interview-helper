@@ -1,9 +1,11 @@
 import { apiRequest } from "../../../lib/api/client";
 import type {
   ConnectionDraft,
+  LocalCapability,
   ModelConnection,
   ModelReadiness,
   ModelRole,
+  RoleTarget,
   RoleBinding,
 } from "./types";
 
@@ -22,10 +24,13 @@ export const modelConnectionApi = {
       { method: "POST" },
     ),
   listBindings: () => apiRequest<RoleBinding[]>("/model-connections/roles"),
-  bindRole: (role: ModelRole, connectionId: string) =>
+  bindRole: (role: ModelRole, target: RoleTarget) =>
     apiRequest<RoleBinding>(`/model-connections/roles/${role}`, {
       method: "PUT",
-      body: JSON.stringify({ connection_id: connectionId }),
+      body: JSON.stringify(target),
     }),
   readiness: () => apiRequest<ModelReadiness>("/model-connections/readiness"),
+  listLocalCapabilities: () => apiRequest<LocalCapability[]>("/local-ai/capabilities"),
+  testLocalCapability: (key: string) =>
+    apiRequest<LocalCapability>(`/local-ai/capabilities/${key}/test`, { method: "POST" }),
 };

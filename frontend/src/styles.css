@@ -694,6 +694,20 @@ a {
   border-top: 1px solid #cfd6df;
 }
 
+.local-capability-list {
+  margin-top: 34px;
+  padding-top: 28px;
+  border-top: 1px solid #cfd6df;
+}
+
+.local-capability-list .panel-heading {
+  margin-bottom: 14px;
+}
+
+.local-capability-list .routing-note {
+  margin: 0 0 14px;
+}
+
 .connection-row {
   display: grid;
   grid-template-columns: 38px minmax(150px, 1fr) 86px 104px 70px;

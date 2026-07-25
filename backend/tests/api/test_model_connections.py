@@ -240,3 +240,36 @@ async def test_base_url_cannot_leak_inline_credentials() -> None:
 
     assert response.status_code == 422
     assert response.json()["code"] == "validation_error"
+
+
+@pytest.mark.asyncio
+async def test_local_capability_binding_has_no_fake_connection_or_api_key() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        bound = await client.put(
+            "/api/model-connections/roles/transcriber",
+            json={"local_capability_key": "sensevoice-small"},
+        )
+        bindings = await client.get("/api/model-connections/roles")
+        invalid_role = await client.put(
+            "/api/model-connections/roles/transcriber",
+            json={"local_capability_key": "bge-m3"},
+        )
+
+    assert bound.status_code == 200
+    assert bound.json()["target_kind"] == "local_capability"
+    assert bound.json()["connection_id"] is None
+    assert bound.json()["local_capability_key"] == "sensevoice-small"
+    assert bindings.json()[0]["model_name"] == "sensevoice-small"
+    assert invalid_role.status_code == 409
+    assert invalid_role.json()["code"] == "local_capability_role_invalid"
+
+    async with async_session_factory() as session:
+        connections = (await session.scalars(select(ModelConnection))).all()
+        binding = await session.scalar(select(ModelRoleBinding))
+    assert connections == []
+    assert binding is not None
+    assert binding.connection_id is None
+    assert binding.local_capability_key == "sensevoice-small"

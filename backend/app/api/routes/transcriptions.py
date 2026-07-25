@@ -5,8 +5,10 @@ from fastapi import APIRouter, File, Form, UploadFile
 from app.api.deps import SessionDep
 from app.api.errors import AppError
 from app.core.config import settings
-from app.db.models.common import ModelRole, ProviderType
+from app.db.models.common import ProviderType
+from app.local_ai.capabilities import LocalCapabilityDefinition
 from app.providers.factory import build_transcription_provider
+from app.providers.openai_transcription import OpenAICompatibleTranscriptionProvider
 from app.providers.speech_base import TranscriptionRequest, TranscriptionResult
 from app.services import model_connections
 
@@ -50,11 +52,7 @@ async def create_transcription(
 
     profile = await model_connections.ensure_local_profile(session)
     try:
-        connection = await model_connections.resolve_role_connection(
-            session,
-            profile.id,
-            ModelRole.TRANSCRIBER,
-        )
+        target = await model_connections.resolve_transcription_target(session, profile.id)
     except AppError as exc:
         if exc.code != "model_role_unbound":
             raise
@@ -63,14 +61,21 @@ async def create_transcription(
             message="尚未配置语音转写模型，仍可继续使用文字回答",
             status_code=409,
         ) from exc
-    if connection.provider_type != ProviderType.OPENAI_COMPATIBLE:
+    if isinstance(target, LocalCapabilityDefinition):
+        provider = OpenAICompatibleTranscriptionProvider(
+            base_url=target.base_url,
+            api_key=None,
+            model=target.model_name,
+            timeout_seconds=settings.local_asr_request_timeout_seconds,
+        )
+    elif target.provider_type != ProviderType.OPENAI_COMPATIBLE:
         raise AppError(
             code="transcription_provider_invalid",
             message="语音转写角色必须绑定 OpenAI-compatible 连接",
             status_code=409,
         )
-
-    provider = build_transcription_provider(connection)
+    else:
+        provider = build_transcription_provider(target)
     try:
         return await provider.transcribe(
             TranscriptionRequest(

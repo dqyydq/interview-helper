@@ -137,3 +137,31 @@ async def test_transcription_rejects_anthropic_binding_and_unknown_audio_type() 
     assert unsupported.json()["code"] == "audio_type_unsupported"
     assert anthropic.status_code == 409
     assert anthropic.json()["code"] == "transcription_provider_invalid"
+
+
+@pytest.mark.asyncio
+async def test_transcription_can_use_local_capability_without_an_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        route,
+        "OpenAICompatibleTranscriptionProvider",
+        lambda **_: StubTranscriptionProvider(),
+    )
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        binding = await client.put(
+            "/api/model-connections/roles/transcriber",
+            json={"local_capability_key": "sensevoice-small"},
+        )
+        response = await client.post(
+            "/api/transcriptions",
+            files={"file": ("answer.webm", b"recorded-answer", "audio/webm")},
+            data={"language": "zh"},
+        )
+
+    assert binding.status_code == 200
+    assert response.status_code == 200
+    assert response.json()["language"] == "zh"

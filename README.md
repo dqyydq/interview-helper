@@ -160,7 +160,7 @@ npm run test:e2e
 
 完整边界见 [隐私与本地数据](docs/privacy.md)。
 
-本地语音转写和 embedding 只会通过 Docker 容器提供；不会要求在宿主机安装 FunASR、TEI、PyTorch 或模型运行时。普通启动不会下载模型，进行面试时也不会触发模型下载、预热或重建索引。升级既有 PostgreSQL volume 或启用本地 AI 前，请先阅读 [Docker-only 本地 AI](docs/local-ai.md)。
+本地语音转写和 embedding 只会通过 Docker 容器提供；不会要求在宿主机安装 FunASR、TEI、PyTorch 或模型运行时。启动已校验的本地服务后，可在“设置 → 模型与 Agent”检查并绑定 SenseVoice、E5 或 BGE-M3，不需要伪造 API Key。普通启动不会下载模型，进行面试时也不会触发模型下载、预热或重建索引。升级既有 PostgreSQL volume 或启用本地 AI 前，请先阅读 [Docker-only 本地 AI](docs/local-ai.md)。
 
 ## 当前限制
 

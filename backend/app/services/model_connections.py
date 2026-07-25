@@ -10,6 +10,7 @@ from app.core.crypto import SecretCipher
 from app.db.models.common import ConnectionStatus, ModelRole, ProviderType
 from app.db.models.model_connection import ModelConnection, ModelRoleBinding
 from app.db.models.profile import UserProfile
+from app.local_ai.capabilities import LocalCapabilityDefinition, get_local_capability
 from app.providers.factory import build_provider
 from app.providers.types import ProviderHealthStatus
 from app.schemas.model_connection import (
@@ -174,7 +175,7 @@ async def list_bindings(
 ) -> list[RoleBindingPublic]:
     rows = await session.execute(
         select(ModelRoleBinding, ModelConnection)
-        .join(ModelConnection, ModelRoleBinding.connection_id == ModelConnection.id)
+        .outerjoin(ModelConnection, ModelRoleBinding.connection_id == ModelConnection.id)
         .where(
             ModelRoleBinding.profile_id == profile_id,
             ModelRoleBinding.deleted_at.is_(None),
@@ -182,29 +183,76 @@ async def list_bindings(
         )
         .order_by(ModelRoleBinding.role)
     )
-    return [
-        RoleBindingPublic(
-            id=binding.id,
-            created_at=binding.created_at,
-            updated_at=binding.updated_at,
-            version=binding.version,
-            role=ModelRole(binding.role),
-            connection_id=binding.connection_id,
-            connection_name=connection.name,
-            model_name=connection.model_name,
-            connection_status=ConnectionStatus(connection.status),
+    bindings: list[RoleBindingPublic] = []
+    for binding, connection in rows.all():
+        if binding.local_capability_key:
+            capability = get_local_capability(binding.local_capability_key)
+            if capability is None:  # Defensive guard for manually damaged local data.
+                continue
+            bindings.append(
+                RoleBindingPublic(
+                    id=binding.id,
+                    created_at=binding.created_at,
+                    updated_at=binding.updated_at,
+                    version=binding.version,
+                    role=ModelRole(binding.role),
+                    target_kind="local_capability",
+                    connection_id=None,
+                    connection_name=None,
+                    model_name=capability.model_name,
+                    connection_status=None,
+                    local_capability_key=capability.key,
+                )
+            )
+            continue
+        if connection is None:  # Defensive guard for a dangling legacy binding.
+            continue
+        bindings.append(
+            RoleBindingPublic(
+                id=binding.id,
+                created_at=binding.created_at,
+                updated_at=binding.updated_at,
+                version=binding.version,
+                role=ModelRole(binding.role),
+                target_kind="model_connection",
+                connection_id=connection.id,
+                connection_name=connection.name,
+                model_name=connection.model_name,
+                connection_status=ConnectionStatus(connection.status),
+                local_capability_key=None,
+            )
         )
-        for binding, connection in rows.all()
-    ]
+    return bindings
 
 
 async def bind_role(
     session: AsyncSession,
     profile_id: uuid.UUID,
     role: ModelRole,
-    connection: ModelConnection,
+    connection: ModelConnection | None = None,
+    local_capability_key: str | None = None,
 ) -> ModelRoleBinding:
-    if connection.status is ConnectionStatus.DISABLED:
+    if (connection is None) == (local_capability_key is None):
+        raise AppError(
+            code="role_target_invalid",
+            message="必须且只能选择一个模型连接或本地能力",
+        )
+    capability: LocalCapabilityDefinition | None = None
+    if local_capability_key is not None:
+        capability = get_local_capability(local_capability_key)
+        if capability is None:
+            raise AppError(
+                code="local_capability_not_found",
+                message="本地能力不存在",
+                status_code=404,
+            )
+        if capability.role != role:
+            raise AppError(
+                code="local_capability_role_invalid",
+                message="该本地能力不能绑定到此 Agent 角色",
+                status_code=409,
+            )
+    elif connection is not None and connection.status is ConnectionStatus.DISABLED:
         raise AppError(code="model_connection_disabled", message="不能绑定已停用的模型连接")
     binding = await session.scalar(
         select(ModelRoleBinding).where(
@@ -214,18 +262,83 @@ async def bind_role(
         )
     )
     if binding:
-        binding.connection_id = connection.id
+        binding.connection_id = connection.id if connection is not None else None
+        binding.local_capability_key = capability.key if capability is not None else None
         binding.touch()
     else:
         binding = ModelRoleBinding(
             profile_id=profile_id,
             role=role,
-            connection_id=connection.id,
+            connection_id=connection.id if connection is not None else None,
+            local_capability_key=capability.key if capability is not None else None,
         )
         session.add(binding)
     await session.commit()
     await session.refresh(binding)
     return binding
+
+
+async def resolve_local_or_connection_target(
+    session: AsyncSession,
+    profile_id: uuid.UUID,
+    role: ModelRole,
+) -> ModelConnection | LocalCapabilityDefinition:
+    """Resolve an exact transcription/embedding binding without chat fallback."""
+
+    if role not in {ModelRole.TRANSCRIBER, ModelRole.EMBEDDING}:
+        raise ValueError("role must be transcription or embedding")
+    binding = await session.scalar(
+        select(ModelRoleBinding).where(
+            ModelRoleBinding.profile_id == profile_id,
+            ModelRoleBinding.role == role,
+            ModelRoleBinding.deleted_at.is_(None),
+        )
+    )
+    if binding is None:
+        raise AppError(
+            code="model_role_unbound",
+            message=f"尚未为 {role.value} 配置可用模型",
+            status_code=409,
+        )
+    if binding.local_capability_key:
+        capability = get_local_capability(binding.local_capability_key)
+        if capability is not None and capability.role == role:
+            return capability
+        raise AppError(
+            code="local_capability_invalid",
+            message="本地能力配置无效",
+            status_code=409,
+        )
+    if binding.connection_id is not None:
+        connection = await session.scalar(
+            select(ModelConnection).where(
+                ModelConnection.id == binding.connection_id,
+                ModelConnection.profile_id == profile_id,
+                ModelConnection.deleted_at.is_(None),
+                ModelConnection.status != ConnectionStatus.DISABLED,
+            )
+        )
+        if connection is not None:
+            return connection
+    raise AppError(
+        code="model_role_unbound",
+        message=f"尚未为 {role.value} 配置可用模型",
+        status_code=409,
+    )
+
+
+async def resolve_transcription_target(
+    session: AsyncSession,
+    profile_id: uuid.UUID,
+) -> ModelConnection | LocalCapabilityDefinition:
+    return await resolve_local_or_connection_target(session, profile_id, ModelRole.TRANSCRIBER)
+
+
+async def resolve_embedding_target(
+    session: AsyncSession,
+    profile_id: uuid.UUID,
+) -> ModelConnection | LocalCapabilityDefinition:
+    return await resolve_local_or_connection_target(session, profile_id, ModelRole.EMBEDDING)
 
 
 async def model_readiness(session: AsyncSession, profile_id: uuid.UUID) -> ModelReadiness:

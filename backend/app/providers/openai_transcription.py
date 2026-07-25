@@ -20,7 +20,7 @@ class OpenAICompatibleTranscriptionProvider(SpeechToTextProvider):
         self,
         *,
         base_url: str,
-        api_key: str,
+        api_key: str | None,
         model: str,
         timeout_seconds: float = 120.0,
         extra_headers: dict[str, str] | None = None,
@@ -41,11 +41,13 @@ class OpenAICompatibleTranscriptionProvider(SpeechToTextProvider):
         return f"{self.base_url}/audio/transcriptions"
 
     def _headers(self) -> dict[str, str]:
-        return {
+        headers = {
             "Accept": "application/json",
             **self.extra_headers,
-            "Authorization": f"Bearer {self.api_key}",
         }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
 
     async def transcribe(self, request: TranscriptionRequest) -> TranscriptionResult:
         if not request.audio:

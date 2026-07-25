@@ -15,9 +15,11 @@ import { modelConnectionApi } from "./api";
 import {
   modelRoles,
   type ConnectionDraft,
+  type LocalCapability,
   type ModelConnection,
   type ModelRole,
   type ProviderType,
+  type RoleTarget,
 } from "./types";
 
 const roleLabels: Record<ModelRole, string> = {
@@ -54,6 +56,14 @@ function statusLabel(status: ModelConnection["status"]) {
   }[status];
 }
 
+function localStatusLabel(status: LocalCapability["status"]) {
+  return {
+    ready: "本地服务已就绪",
+    unavailable: "服务未启动或不可达",
+    mismatch: "运行中的模型不匹配",
+  }[status];
+}
+
 export function ModelSettingsPage() {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(initialDraft);
@@ -62,12 +72,17 @@ export function ModelSettingsPage() {
   const connections = useQuery({ queryKey: ["model-connections"], queryFn: modelConnectionApi.list });
   const bindings = useQuery({ queryKey: ["model-bindings"], queryFn: modelConnectionApi.listBindings });
   const readiness = useQuery({ queryKey: ["model-readiness"], queryFn: modelConnectionApi.readiness });
+  const localCapabilities = useQuery({
+    queryKey: ["local-ai-capabilities"],
+    queryFn: modelConnectionApi.listLocalCapabilities,
+  });
 
   const refresh = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["model-connections"] }),
       queryClient.invalidateQueries({ queryKey: ["model-bindings"] }),
       queryClient.invalidateQueries({ queryKey: ["model-readiness"] }),
+      queryClient.invalidateQueries({ queryKey: ["local-ai-capabilities"] }),
     ]);
   };
 
@@ -88,9 +103,15 @@ export function ModelSettingsPage() {
     onSuccess: refresh,
   });
   const bindRole = useMutation({
-    mutationFn: ({ role, connectionId }: { role: ModelRole; connectionId: string }) =>
-      modelConnectionApi.bindRole(role, connectionId),
+    mutationFn: ({ role, target }: { role: ModelRole; target: RoleTarget }) =>
+      modelConnectionApi.bindRole(role, target),
     onSuccess: refresh,
+  });
+  const testLocalCapability = useMutation({
+    mutationFn: modelConnectionApi.testLocalCapability,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["local-ai-capabilities"] });
+    },
   });
 
   const updateProvider = (providerType: ProviderType) => {
@@ -109,7 +130,14 @@ export function ModelSettingsPage() {
     createConnection.mutate(draft);
   };
 
-  const error = [connections.error, bindings.error, readiness.error, createConnection.error].find(
+  const error = [
+    connections.error,
+    bindings.error,
+    readiness.error,
+    localCapabilities.error,
+    createConnection.error,
+    testLocalCapability.error,
+  ].find(
     (item) => item instanceof Error,
   );
 
@@ -296,6 +324,45 @@ export function ModelSettingsPage() {
               <div className="connection-empty">尚未配置模型连接。先添加至少一个面试模型。</div>
             )}
           </div>
+
+          <div className="local-capability-list" aria-labelledby="local-capabilities-title">
+            <div className="panel-heading">
+              <div>
+                <span>03 / LOCAL DOCKER</span>
+                <h2 id="local-capabilities-title">本地 AI 服务</h2>
+              </div>
+            </div>
+            <p className="routing-note">
+              先在终端安装已校验模型并启动对应 Docker profile；这里只检查固定的 loopback 服务，既不需要 API Key，也不会自动下载或启动容器。
+            </p>
+            {localCapabilities.data?.map((capability) => (
+              <article className="connection-row" key={capability.key}>
+                <span className="provider-glyph"><Cpu size={18} aria-hidden="true" /></span>
+                <div className="connection-identity">
+                  <strong>{capability.title}</strong>
+                  <span>{capability.compose_profile} · {capability.model_name}</span>
+                </div>
+                <span className="protocol-label">{capability.runtime.toUpperCase()}</span>
+                <span className={`connection-status ${capability.status}`}>
+                  {capability.status === "ready" && <Check size={13} aria-hidden="true" />}
+                  {localStatusLabel(capability.status)}
+                </span>
+                <div className="row-actions">
+                  <button
+                    type="button"
+                    aria-label={`检查 ${capability.title}`}
+                    disabled={testLocalCapability.isPending}
+                    onClick={() => testLocalCapability.mutate(capability.key)}
+                  >
+                    <Play size={15} aria-hidden="true" />
+                  </button>
+                </div>
+              </article>
+            ))}
+            {!localCapabilities.isLoading && !localCapabilities.data?.length && (
+              <div className="connection-empty">本地 Docker 能力目录暂不可用。</div>
+            )}
+          </div>
         </section>
 
         <aside className="routing-panel" aria-labelledby="routing-title">
@@ -315,6 +382,10 @@ export function ModelSettingsPage() {
                     (connection) => connection.provider_type === "openai_compatible",
                   )
                 : connections.data;
+              const localRoleCapabilities = localCapabilities.data?.filter((item) => item.role === role);
+              const selectedTarget = binding?.target_kind === "local_capability"
+                ? `local:${binding.local_capability_key}`
+                : binding?.connection_id ?? "";
               return (
                 <label className="role-row" key={role}>
                   <span>
@@ -323,10 +394,16 @@ export function ModelSettingsPage() {
                   </span>
                   <select
                     aria-label={`${roleLabels[role]}模型`}
-                    value={binding?.connection_id ?? ""}
+                    value={selectedTarget}
                     onChange={(event) => {
-                      if (event.target.value) {
-                        bindRole.mutate({ role, connectionId: event.target.value });
+                      const target = event.target.value;
+                      if (target.startsWith("local:")) {
+                        bindRole.mutate({
+                          role,
+                          target: { local_capability_key: target.slice("local:".length) },
+                        });
+                      } else if (target) {
+                        bindRole.mutate({ role, target: { connection_id: target } });
                       }
                     }}
                   >
@@ -336,6 +413,15 @@ export function ModelSettingsPage() {
                         {connection.name} · {connection.model_name}
                       </option>
                     ))}
+                    {!!localRoleCapabilities?.length && (
+                      <optgroup label="本地 Docker">
+                        {localRoleCapabilities.map((capability) => (
+                          <option key={capability.key} value={`local:${capability.key}`}>
+                            {capability.title} · {localStatusLabel(capability.status)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </label>
               );

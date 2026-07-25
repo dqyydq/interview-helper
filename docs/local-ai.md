@@ -1,6 +1,6 @@
 # Docker-only 本地 AI
 
-> 状态：Docker 交付底座、受校验的模型 loader、离线 FunASR 与 TEI 运行 profile 已建立；应用内的本地运行时注册、角色绑定和 pgvector 检索接入仍在后续阶段实现。
+> 状态：Docker 交付底座、受校验的模型 loader、离线 FunASR 与 TEI 运行 profile，以及应用内的本地能力探测和角色绑定已建立；pgvector 检索接入仍在后续阶段实现。
 
 Interview Helper 的本地语音转写与本地 embedding 只会通过 Docker 容器运行。宿主机不需要、也不应为本应用安装 FunASR、TEI、PyTorch、CUDA Python 包或模型运行时。云端模型仍然是独立、显式选择的选项；本地服务故障时应用不得把音频、简历或回答静默发送到云端。
 
@@ -11,7 +11,7 @@ Interview Helper 的本地语音转写与本地 embedding 只会通过 Docker �
 - `interview-helper-models` 保存将来已校验的模型文件，`interview-helper-model-state` 保存下载和校验状态；它们与业务数据库 volume 分离。
 - `model-loader` 位于显式的 `model-loader` profile。普通 `docker compose up -d postgres` 不会启动它，也不会拉取镜像、构建镜像或下载模型。
 - loader 只能安装受支持 preset：SenseVoiceSmall、multilingual-e5-small 和 BGE-M3。每个 preset 固定到不可变的 ModelScope commit；它会先检查模型 volume 的保守可用空间，再写入 staging 区、逐文件校验 SHA-256，成功后才原子写入 active marker；离线包还必须带匹配的 `offline-manifest.json`。同一 preset 的安装会通过共享 state volume 串行化，避免重复点击或两个容器竞争覆盖 active 状态。
-- 本阶段已经提供本地 FunASR 与 TEI 的 Docker profile；应用内设置页、角色绑定和 pgvector Alembic migration 仍未完成。不要手工执行 `CREATE EXTENSION vector`。
+- 本阶段已经提供本地 FunASR 与 TEI 的 Docker profile、设置页探测和 `Transcriber` / `Embedding` 的本地能力绑定；pgvector Alembic migration 仍未完成。不要手工执行 `CREATE EXTENSION vector`。
 
 只检查 Compose 文件时使用：
 
@@ -72,6 +72,17 @@ docker compose --profile local-embedding-bge up -d local-embedding-bge
 ```
 
 两种 embedding 服务都提供 `http://127.0.0.1:8081/v1/embeddings` 和固定模型名 `interview-helper-local-embedding`。当前 BGE-M3 仅以 1024 维 dense embedding 使用；稀疏/ColBERT 多向量能力不在本阶段的 OpenAI-compatible 接口承诺范围内。服务使用受限的 CPU 基线，稍后的 GPU profile 会要求用户明确选择与显卡计算能力匹配的镜像，绝不自动拉取 CUDA 镜像。
+
+### 在应用内启用
+
+服务启动后，进入“设置 → 模型与 Agent”。“本地 AI 服务”区域只探测三个固定的 loopback 目标；它不会把浏览器输入的 URL、路径或 API Key 交给后端，也不会代替你启动 Docker。点击卡片右侧的检查按钮可重新探测。
+
+探测成功后，在右侧的 Agent 角色路由中选择对应的“本地 Docker”选项：
+
+- `SenseVoice 本地语音转写` 只能绑定到“语音转写”；
+- `E5` 或 `BGE-M3` 只能绑定到“向量检索”。
+
+这些限制同时由后端和数据库约束执行，因此本地转写不会被当成聊天模型，也不需要填写假的 API Key。服务未启动时也可以先保存绑定；发起转写时会明确报出本地服务不可达，不会静默回退到云端。
 
 停止本地运行服务不会删除模型或数据库：
 

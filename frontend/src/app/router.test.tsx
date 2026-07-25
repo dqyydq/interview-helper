@@ -18,6 +18,8 @@ vi.mock("../features/settings/models/api", () => ({
       missing_roles: ["interviewer", "evaluator"],
       degraded_roles: [],
     }),
+    listLocalCapabilities: vi.fn().mockResolvedValue([]),
+    testLocalCapability: vi.fn(),
   },
 }));
 

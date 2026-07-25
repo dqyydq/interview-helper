@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, Column, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field
 
@@ -40,7 +40,20 @@ class ModelConnection(EntityBase, table=True):
 
 class ModelRoleBinding(EntityBase, table=True):
     __tablename__ = "model_role_bindings"
-    __table_args__ = (UniqueConstraint("profile_id", "role", name="uq_model_role_binding"),)
+    __table_args__ = (
+        UniqueConstraint("profile_id", "role", name="uq_model_role_binding"),
+        CheckConstraint(
+            "num_nonnulls(connection_id, local_capability_key) = 1",
+            name="ck_model_role_binding_exactly_one_target",
+        ),
+        CheckConstraint(
+            "local_capability_key IS NULL "
+            "OR (role = 'transcriber' AND local_capability_key = 'sensevoice-small') "
+            "OR (role = 'embedding' "
+            "AND local_capability_key IN ('multilingual-e5-small', 'bge-m3'))",
+            name="ck_model_role_binding_local_capability_role",
+        ),
+    )
 
     profile_id: uuid.UUID = Field(
         foreign_key="user_profiles.id",
@@ -48,8 +61,14 @@ class ModelRoleBinding(EntityBase, table=True):
         index=True,
     )
     role: ModelRole = Field(sa_column=Column(String(32), nullable=False, index=True))
-    connection_id: uuid.UUID = Field(
+    connection_id: uuid.UUID | None = Field(
+        default=None,
         foreign_key="model_connections.id",
         ondelete="RESTRICT",
         index=True,
+    )
+    local_capability_key: str | None = Field(
+        default=None,
+        max_length=80,
+        sa_column=Column(String(80), nullable=True),
     )

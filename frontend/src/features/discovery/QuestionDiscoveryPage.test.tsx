@@ -148,10 +148,12 @@ describe("QuestionDiscoveryPage", () => {
       {
         id: "binding-researcher",
         role: "researcher",
+        target_kind: "model_connection",
         connection_id: "model-1",
         connection_name: "Researcher",
         model_name: "researcher-model",
         connection_status: "healthy",
+        local_capability_key: null,
       },
     ]);
   });
