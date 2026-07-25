@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | React/Vite | `http://localhost:5173` | 产品界面 |
 | FastAPI | `http://localhost:8000` | REST、SSE 与 WebSocket |
-| PostgreSQL | `localhost:5432` | 持久化事实源 |
+| PostgreSQL | `127.0.0.1:5432` | 持久化事实源（pgvector PostgreSQL 17 镜像） |
 | Worker | 无端口 | 计划、简历、摘要与评估任务 |
 | Mock Provider | `http://127.0.0.1:8010` | 本地确定性开发演示 |
 
@@ -32,6 +32,21 @@ npm ci
 ```
 
 `seed_companies` 可以重复运行：它导入公司与轮次骨架，不补造未经来源验证的公司风格事实。
+
+## Docker-only 本地 AI 底座
+
+本地 ASR 与 embedding 的运行时将只通过 Docker 提供，宿主机不安装 FunASR、TEI、PyTorch 或模型运行时。当前提交建立了受控 named volumes、禁用默认启动的 `model-loader` profile 与离线可验证的权重交付器；本地 FunASR / TEI 推理服务仍未接入。
+
+普通的 `docker compose up -d postgres` 不会下载模型。面试进行中也不会下载模型、预热模型或重建向量索引。`postgres` 现使用不可变的 pgvector 0.8.1 / PostgreSQL 17 镜像，并只绑定到 `127.0.0.1`；已有 `interview-helper-postgres` volume 的安全升级与备份步骤见 [Docker-only 本地 AI](local-ai.md)。升级时绝不能使用 `docker compose down -v`。
+
+只检查 Compose 配置时可以运行：
+
+```powershell
+docker compose config --quiet
+docker compose --profile model-loader config --quiet
+```
+
+这两个命令不会拉取镜像、构建镜像、启动容器或下载模型。
 
 ## 启动
 

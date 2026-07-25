@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interview-helper.local/schemas/model-preset-v1.json",
+  "title": "Interview Helper verified local model preset",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "display_name", "capability", "source", "files", "storage", "license", "runtime"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"},
+    "display_name": {"type": "string", "minLength": 1, "maxLength": 120},
+    "capability": {"enum": ["embedding", "transcription"]},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "repository", "revision", "revision_policy"],
+      "properties": {
+        "provider": {"const": "modelscope"},
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}/[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"},
+        "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "revision_policy": {"const": "pinned"}
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "size_bytes"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "allOf": [
+              {"not": {"const": "."}},
+              {"pattern": "^(?!/)(?!.*\\\\)(?!.*:)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"}
+            ]
+          },
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "size_bytes": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["download_bytes", "recommended_free_bytes"],
+      "properties": {
+        "download_bytes": {"type": "integer", "minimum": 1},
+        "recommended_free_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "license": {"type": "string", "minLength": 1},
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consumer", "network_at_runtime"],
+      "properties": {
+        "consumer": {"enum": ["tei", "funasr"]},
+        "network_at_runtime": {"const": false}
+      }
+    },
+    "embedding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimensions", "normalize", "query_prefix", "passage_prefix"],
+      "properties": {
+        "dimensions": {"type": "integer", "minimum": 1},
+        "normalize": {"type": "boolean"},
+        "query_prefix": {"type": "string"},
+        "passage_prefix": {"type": "string"}
+      }
+    },
+    "asr": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["languages", "supports_itn"],
+      "properties": {
+        "languages": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "supports_itn": {"type": "boolean"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"capability": {"const": "embedding"}}},
+      "then": {
+        "required": ["embedding"],
+        "not": {"required": ["asr"]},
+        "properties": {"runtime": {"properties": {"consumer": {"const": "tei"}}}}
+      }
+    },
+    {
+      "if": {"properties": {"capability": {"const": "transcription"}}},
+      "then": {
+        "required": ["asr"],
+        "not": {"required": ["embedding"]},
+        "properties": {"runtime": {"properties": {"consumer": {"const": "funasr"}}}}
+      }
+    }
+  ]
+}

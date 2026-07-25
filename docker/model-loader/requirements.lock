@@ -1,0 +1,10 @@
+# Resolved with `uv pip compile` on 2026-07-25. The host application never
+# installs ModelScope, FunASR, PyTorch, or model files.
+certifi==2026.7.22
+charset-normalizer==3.4.9
+filelock==3.32.0
+idna==3.18
+modelscope-hub==0.1.8
+requests==2.34.2
+tqdm==4.69.1
+urllib3==2.7.0

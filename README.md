@@ -24,7 +24,7 @@ Interview Helper 是一个本地优先、开源的 AI 模拟面试应用。它�
 - Git
 - [uv](https://docs.astral.sh/uv/) 与 Python 3.12
 - Node.js 20.19+ 或 22.12+ 及更高版本，以及 npm
-- Docker Desktop（用于 PostgreSQL 17）
+- Docker Desktop（用于 PostgreSQL 17，以及可选的 Docker-only 本地 AI）
 
 ```powershell
 git clone <your-repository-url> interview_helper
@@ -160,6 +160,8 @@ npm run test:e2e
 
 完整边界见 [隐私与本地数据](docs/privacy.md)。
 
+本地语音转写和 embedding 的后续支持只会通过 Docker 容器提供；不会要求在宿主机安装 FunASR、TEI、PyTorch 或模型运行时。普通启动不会下载模型，进行面试时也不会触发模型下载、预热或重建索引。升级既有 PostgreSQL volume 或启用本地 AI 前，请先阅读 [Docker-only 本地 AI](docs/local-ai.md)。
+
 ## 当前限制
 
 - 暂无面试官文字转语音（TTS），面试官以文字回答。
@@ -174,6 +176,7 @@ npm run test:e2e
 - [本地开发与测试](docs/local-development.md)
 - [模型 Provider 与角色路由](docs/model-providers.md)
 - [隐私、删除与备份](docs/privacy.md)
+- [Docker-only 本地 AI、升级与备份](docs/local-ai.md)
 - [产品与设计规格](docs/superpowers/specs/2026-07-18-interview-helper-product-design.md)
 - [上下文与记忆设计](docs/superpowers/specs/2026-07-18-context-memory-design.md)
 - [第一阶段实施计划](docs/superpowers/plans/2026-07-18-interview-helper-phase1-implementation-plan.md)

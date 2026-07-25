@@ -2,13 +2,17 @@ name: interview-helper
 
 services:
   postgres:
-    image: postgres:17-alpine
+    # Keep the PostgreSQL major version aligned with the existing named volume.
+    # The pgvector extension itself is enabled by a future Alembic migration,
+    # never by an init script that would be skipped for an existing volume.
+    # Immutable multi-architecture OCI index for pgvector 0.8.1 / PostgreSQL 17.
+    image: pgvector/pgvector@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-interview_helper}
       POSTGRES_USER: ${POSTGRES_USER:-interview_helper}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - interview-helper-postgres:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
@@ -20,5 +24,25 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  # This profile never runs as part of a normal `docker compose up`.
+  # Keeping model files and loader state in separate named volumes lets future
+  # model services consume only verified, already-downloaded artifacts.
+  model-loader:
+    profiles: ["model-loader"]
+    build:
+      context: ./docker/model-loader
+    # `status` is intentionally offline-only. Explicit `docker compose run`
+    # commands choose a preset and an install source; ordinary startup does not
+    # build this image or download a model.
+    command: ["status", "--preset", "multilingual-e5-small"]
+    volumes:
+      - interview-helper-models:/models
+      - interview-helper-model-state:/state
+      - ./docker/model-presets:/presets:ro
+      - ${INTERVIEW_HELPER_LOCAL_AI_IMPORT_DIR:-./data/local-ai-import}:/offline:ro
+    restart: "no"
+
 volumes:
   interview-helper-postgres:
+  interview-helper-models:
+  interview-helper-model-state:

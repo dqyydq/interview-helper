@@ -6,6 +6,7 @@ Interview Helper 第一阶段面向单机单用户。它是“本地优先”，
 
 - PostgreSQL：公司、轮次、题库、简历解析结果、面试计划、确认消息、摘要、长期记忆、报告、诊断计数和模型连接密文。
 - `data/uploads/<profile-id>/`：简历源文件，使用随机文件名并与用户展示文件名分离。
+- Docker named volumes `interview-helper-models` 与 `interview-helper-model-state`：后续经用户显式安装、校验完成的本地模型文件及其下载/校验状态。它们不包含 API Key、简历、面试回答或数据库业务数据。
 - 浏览器临时状态：尚未确认的输入、录音转写编辑稿和代码白板草稿。
 
 应用不把每个流式 token 写入数据库，只保存最终确认消息。摘要和长期记忆都是可重新生成、可追溯的派生数据；它们不会覆盖原始消息。
@@ -29,6 +30,10 @@ Interview Helper 第一阶段面向单机单用户。它是“本地优先”，
 用户主动录制并提交的单个音频文件。转写结果先回到浏览器供编辑确认，确认前不作为面试回答入库。
 
 不同模型服务有各自的数据保留政策。使用真实 Provider 前，应自行审查其区域、日志、训练和删除条款。
+
+### Docker-only 本地 AI（后续能力）
+
+用户明确启用本地容器后，音频或 embedding 请求只会在 `127.0.0.1` 上的本地服务与应用之间传递，不会静默回退到云端。模型文件仅在用户显式执行安装流程时从其选择的模型来源下载；普通应用启动和进行中的面试不会下载模型、预热模型或重建索引。当前 Compose 只预留该能力的 volumes 与 profile，尚未提供可运行的本地模型服务。
 
 ## 不可信数据边界
 
@@ -65,6 +70,8 @@ DELETE /api/resumes/{resume_id}
 1. PostgreSQL dump。
 2. `data/uploads`。
 3. 当前 `.env` 中的 `INTERVIEW_HELPER_ENCRYPTION_SECRET`，单独加密保存。
+
+模型 volumes 不属于业务数据备份的必需组成部分：它们可能很大，并且在未来可由经过校验的 manifest 重新获取。不要把模型 volume 当作数据库或上传文件的替代备份；其安全升级步骤见 [Docker-only 本地 AI](local-ai.md)。
 
 示例：
 

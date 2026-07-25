@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "multilingual-e5-small",
+  "display_name": "multilingual-e5-small",
+  "capability": "embedding",
+  "source": {
+    "provider": "modelscope",
+    "repository": "intfloat/multilingual-e5-small",
+    "revision": "bdd905ef05181adf3ebbfaac5cd5bd4ed9a58760",
+    "revision_policy": "pinned"
+  },
+  "files": [
+    {"path": "1_Pooling/config.json", "sha256": "987f7a67a38fa564c849bb5d277c52ab9088a84368fc0be31a354125aebb12a0", "size_bytes": 200},
+    {"path": "config.json", "sha256": "69137736cab8b8903a07fe8afaafdda25aac55415a12a55d1bffa9f581abf959", "size_bytes": 655},
+    {"path": "configuration.json", "sha256": "007c616ed9187f4f3d6096ed2d55cece33c3f48866dbd7bc6afefcb9645a37c1", "size_bytes": 77},
+    {"path": "model.safetensors", "sha256": "1a55775f53449dac10a2bcbc312469fac40b96d53198c407081a831f81c98477", "size_bytes": 470641600},
+    {"path": "modules.json", "sha256": "c6e29747481e8b5dd2b58401966aeac910de39092f90cda9a704b1545f902b04", "size_bytes": 387},
+    {"path": "sentence_bert_config.json", "sha256": "948201d8329907aae938fa62f9ceeed53f5694dacc2b87b9f3b78b37ee986529", "size_bytes": 57},
+    {"path": "sentencepiece.bpe.model", "sha256": "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865", "size_bytes": 5069051},
+    {"path": "special_tokens_map.json", "sha256": "d05497f1da52c5e09554c0cd874037a083e1dc1b9cfd48034d1c717f1afc07a7", "size_bytes": 167},
+    {"path": "tokenizer.json", "sha256": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39", "size_bytes": 17082730},
+    {"path": "tokenizer_config.json", "sha256": "a1d6bc8734a6f635dc158508bef000f8e2e5a759c7d92f984b2c86e5ff53425b", "size_bytes": 443}
+  ],
+  "storage": {"download_bytes": 492795367, "recommended_free_bytes": 1500000000},
+  "license": "mit",
+  "runtime": {"consumer": "tei", "network_at_runtime": false},
+  "embedding": {"dimensions": 384, "normalize": true, "query_prefix": "query: ", "passage_prefix": "passage: "}
+}
