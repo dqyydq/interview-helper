@@ -1,6 +1,6 @@
 # Docker-only 本地 AI
 
-> 状态：Docker 交付底座与受校验的模型 loader 已建立；本地 ASR、embedding 推理服务和设置页仍在后续阶段实现。
+> 状态：Docker 交付底座、受校验的模型 loader、离线 FunASR 与 TEI 运行 profile 已建立；应用内的本地运行时注册、角色绑定和 pgvector 检索接入仍在后续阶段实现。
 
 Interview Helper 的本地语音转写与本地 embedding 只会通过 Docker 容器运行。宿主机不需要、也不应为本应用安装 FunASR、TEI、PyTorch、CUDA Python 包或模型运行时。云端模型仍然是独立、显式选择的选项；本地服务故障时应用不得把音频、简历或回答静默发送到云端。
 
@@ -11,7 +11,7 @@ Interview Helper 的本地语音转写与本地 embedding 只会通过 Docker �
 - `interview-helper-models` 保存将来已校验的模型文件，`interview-helper-model-state` 保存下载和校验状态；它们与业务数据库 volume 分离。
 - `model-loader` 位于显式的 `model-loader` profile。普通 `docker compose up -d postgres` 不会启动它，也不会拉取镜像、构建镜像或下载模型。
 - loader 只能安装受支持 preset：SenseVoiceSmall、multilingual-e5-small 和 BGE-M3。每个 preset 固定到不可变的 ModelScope commit；它会先检查模型 volume 的保守可用空间，再写入 staging 区、逐文件校验 SHA-256，成功后才原子写入 active marker；离线包还必须带匹配的 `offline-manifest.json`。同一 preset 的安装会通过共享 state volume 串行化，避免重复点击或两个容器竞争覆盖 active 状态。
-- 本阶段尚未提供本地 FunASR、TEI、设置页或 pgvector Alembic migration。不要手工执行 `CREATE EXTENSION vector`。
+- 本阶段已经提供本地 FunASR 与 TEI 的 Docker profile；应用内设置页、角色绑定和 pgvector Alembic migration 仍未完成。不要手工执行 `CREATE EXTENSION vector`。
 
 只检查 Compose 文件时使用：
 
@@ -31,6 +31,56 @@ docker compose --profile model-loader run --rm --no-deps model-loader recover-lo
 ```
 
 普通 `install` 永远不会自动抢占锁，因为低带宽下载大型模型可能持续很久；后续应用设置页会把 `install_in_progress` 作为“正在安装，请稍后刷新”的可恢复状态处理。
+
+## 运行已校验的本地服务
+
+本地服务只消费已经由 `model-loader` 完整校验并标记为 active 的固定版本模型。运行 profile 不会下载权重、不会调用 ModelScope，也不会在失败时把音频或文本自动转发到云端。
+
+先选择一个预设并显式安装。以下命令是唯一会联网下载模型权重的路径；若网络无法访问 ModelScope，可改用经过 `offline-manifest.json` 校验的离线导入流程。
+
+```powershell
+# 语音转写：SenseVoiceSmall
+docker compose --profile model-loader run --rm --no-deps model-loader install --preset sensevoice-small --source modelscope
+
+# 轻量本地向量检索：multilingual-e5-small（384 维）
+docker compose --profile model-loader run --rm --no-deps model-loader install --preset multilingual-e5-small --source modelscope
+
+# 高质量本地向量检索：BGE-M3（1024 维）
+docker compose --profile model-loader run --rm --no-deps model-loader install --preset bge-m3 --source modelscope
+```
+
+每次启动运行服务前，Compose 会先以只读方式运行 `model-loader verify`，重新核验 active marker、文件清单和 SHA-256。校验阶段需要读取模型文件：BGE-M3 约 2.3 GB，因此首次看到“校验模型”而非立即可用是正常的，不应把它误认为无反馈的卡顿。
+
+### 本地语音转写（FunASR）
+
+```powershell
+docker compose --profile local-asr up --build local-asr
+```
+
+服务只监听 `http://127.0.0.1:${INTERVIEW_HELPER_LOCAL_ASR_PORT:-8011}`，健康检查为 `/health`，OpenAI-compatible 转写端点为 `/v1/audio/transcriptions`。默认单并发、单段最多 90 秒和 32 MiB；这是为了避免 CPU 机器上的单个超长音频吞掉后续面试回答。请求取消后，当前推理仍会占用唯一槽位直到实际完成，避免同一 FunASR 模型被并发调用。
+
+### 本地向量检索（TEI）
+
+二者只能选择其一。它们共用 `127.0.0.1:${INTERVIEW_HELPER_LOCAL_EMBEDDINGS_PORT:-8081}`，因此若误同时启动会得到明确的端口冲突，而不会悄悄切换模型。
+
+```powershell
+# 资源更省、中文与英文题库都适用
+docker compose --profile local-embedding-e5 up -d local-embedding-e5
+
+# 质量优先；CPU 也可以运行，但更适合拥有充足内存或 GPU 的设备
+docker compose --profile local-embedding-bge up -d local-embedding-bge
+```
+
+两种 embedding 服务都提供 `http://127.0.0.1:8081/v1/embeddings` 和固定模型名 `interview-helper-local-embedding`。当前 BGE-M3 仅以 1024 维 dense embedding 使用；稀疏/ColBERT 多向量能力不在本阶段的 OpenAI-compatible 接口承诺范围内。服务使用受限的 CPU 基线，稍后的 GPU profile 会要求用户明确选择与显卡计算能力匹配的镜像，绝不自动拉取 CUDA 镜像。
+
+停止本地运行服务不会删除模型或数据库：
+
+```powershell
+docker compose --profile local-asr stop local-asr
+docker compose --profile local-embedding-e5 stop local-embedding-e5
+```
+
+不要使用 `docker compose down -v`，它会删除 named volumes。
 
 ## 运行前提
 
@@ -76,8 +126,8 @@ docker compose --profile model-loader run --rm --no-deps model-loader recover-lo
 
 如 PostgreSQL 无法启动、日志出现 data directory 或 major-version 错误，立即停止，不要删除或重建原 volume。保留原 volume、日志和 dump，在独立副本上验证恢复路径后再处理。模型 volumes 不是业务数据备份的替代品；它们可由受控 manifest 重新获得，而数据库、上传文件和加密密钥仍必须按 [隐私与本地数据](privacy.md) 备份。
 
-## 后续本地服务边界
+## 服务边界
 
-后续实现会把本地 FunASR 和 TEI 分别绑定到 loopback 地址（计划为 `127.0.0.1:8011` 与 `127.0.0.1:8080`），并让 FastAPI 通过固定的 OpenAI-compatible 协议访问。它们不会共享 Docker socket，不会暴露模型 volume 给前端，也不会允许网页拼接 Docker 命令、镜像名、容器参数或宿主路径。
+本地 FunASR 和 TEI 分别绑定到 loopback 地址 `127.0.0.1:8011` 与 `127.0.0.1:8081`，并使用固定的 OpenAI-compatible 协议。它们不会共享 Docker socket，不会暴露模型 volume 给前端，也不会允许网页拼接 Docker 命令、镜像名、容器参数或宿主路径。
 
-在这些服务和 health check 实际落地前，请继续使用文本回答或已显式配置的云端 Provider。云端 API、Docker 本地轻量 embedding、Docker 本地高质量 embedding 将始终是用户可见的独立选择，而不是自动回退链路。
+云端 API、Docker 本地轻量 embedding、Docker 本地高质量 embedding 始终是用户可见的独立选择，而不是自动回退链路。本地服务异常时，应用应清晰提示并允许改用文本作答或用户主动选择的云端 Provider。

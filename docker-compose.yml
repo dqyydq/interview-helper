@@ -42,7 +42,173 @@ services:
       - ${INTERVIEW_HELPER_LOCAL_AI_IMPORT_DIR:-./data/local-ai-import}:/offline:ro
     restart: "no"
 
+  # Runtime profiles never download models.  They first reuse the loader's
+  # offline verifier against read-only volumes, then start a single local
+  # capability service only if its pinned active revision is intact.
+  model-verify-sensevoice:
+    profiles: ["local-asr"]
+    build:
+      context: ./docker/model-loader
+    command: ["verify", "--preset", "sensevoice-small"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1770,uid=10001,gid=10001
+    volumes:
+      - interview-helper-models:/models:ro
+      - interview-helper-model-state:/state:ro
+      - ./docker/model-presets:/presets:ro
+    network_mode: "none"
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  local-asr:
+    profiles: ["local-asr"]
+    build:
+      context: ./docker/local-asr
+    depends_on:
+      model-verify-sensevoice:
+        condition: service_completed_successfully
+    environment:
+      LOCAL_ASR_DEVICE: cpu
+      LOCAL_ASR_MAX_AUDIO_BYTES: ${INTERVIEW_HELPER_LOCAL_ASR_MAX_AUDIO_BYTES:-33554432}
+      LOCAL_ASR_MAX_AUDIO_SECONDS: ${INTERVIEW_HELPER_LOCAL_ASR_MAX_AUDIO_SECONDS:-90}
+      LOCAL_ASR_MAX_CONCURRENT_REQUESTS: ${INTERVIEW_HELPER_LOCAL_ASR_MAX_CONCURRENT_REQUESTS:-1}
+    ports:
+      - "127.0.0.1:${INTERVIEW_HELPER_LOCAL_ASR_PORT:-8011}:8011"
+    volumes:
+      - interview-helper-models:/models:ro
+      - interview-helper-model-state:/state:ro
+    networks:
+      - local-ai-internal
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=512m,mode=1770,uid=10001,gid=10001
+    init: true
+    pids_limit: 128
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    restart: on-failure:3
+
+  model-verify-multilingual-e5:
+    profiles: ["local-embedding-e5"]
+    build:
+      context: ./docker/model-loader
+    command: ["verify", "--preset", "multilingual-e5-small"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1770,uid=10001,gid=10001
+    volumes:
+      - interview-helper-models:/models:ro
+      - interview-helper-model-state:/state:ro
+      - ./docker/model-presets:/presets:ro
+    network_mode: "none"
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  local-embedding-e5:
+    # Choose exactly one local embedding profile.  Both profiles bind the
+    # same loopback endpoint so an accidental dual start fails clearly.
+    profiles: ["local-embedding-e5"]
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9.3@sha256:ad950d30878eceb72aaf32024d26fa2b1d04a75304fa0b4776b49aa1941fea07
+    depends_on:
+      model-verify-multilingual-e5:
+        condition: service_completed_successfully
+    environment:
+      MODEL_ID: /models/installs/multilingual-e5-small/bdd905ef05181adf3ebbfaac5cd5bd4ed9a58760
+      SERVED_MODEL_NAME: interview-helper-local-embedding
+      MAX_CONCURRENT_REQUESTS: "8"
+      MAX_BATCH_TOKENS: "4096"
+      MAX_CLIENT_BATCH_SIZE: "16"
+      TOKENIZATION_WORKERS: "4"
+      AUTO_TRUNCATE: "true"
+      PAYLOAD_LIMIT: "1000000"
+      HF_HUB_OFFLINE: "1"
+      HF_HOME: /tmp/huggingface
+      XDG_CACHE_HOME: /tmp/cache
+      DISABLE_SPANS: "true"
+      JSON_OUTPUT: "true"
+    ports:
+      - "127.0.0.1:${INTERVIEW_HELPER_LOCAL_EMBEDDINGS_PORT:-8081}:80"
+    volumes:
+      - interview-helper-models:/models:ro
+    networks:
+      - local-ai-internal
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=256m,mode=1770,uid=10001,gid=10001
+    init: true
+    pids_limit: 128
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    restart: on-failure:3
+
+  model-verify-bge-m3:
+    profiles: ["local-embedding-bge"]
+    build:
+      context: ./docker/model-loader
+    command: ["verify", "--preset", "bge-m3"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1770,uid=10001,gid=10001
+    volumes:
+      - interview-helper-models:/models:ro
+      - interview-helper-model-state:/state:ro
+      - ./docker/model-presets:/presets:ro
+    network_mode: "none"
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  local-embedding-bge:
+    profiles: ["local-embedding-bge"]
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9.3@sha256:ad950d30878eceb72aaf32024d26fa2b1d04a75304fa0b4776b49aa1941fea07
+    depends_on:
+      model-verify-bge-m3:
+        condition: service_completed_successfully
+    environment:
+      MODEL_ID: /models/installs/bge-m3/e44369c5623cc146f016da906583db4ee0e3488d
+      SERVED_MODEL_NAME: interview-helper-local-embedding
+      MAX_CONCURRENT_REQUESTS: "4"
+      MAX_BATCH_TOKENS: "4096"
+      MAX_CLIENT_BATCH_SIZE: "8"
+      TOKENIZATION_WORKERS: "4"
+      AUTO_TRUNCATE: "true"
+      PAYLOAD_LIMIT: "1000000"
+      HF_HUB_OFFLINE: "1"
+      HF_HOME: /tmp/huggingface
+      XDG_CACHE_HOME: /tmp/cache
+      DISABLE_SPANS: "true"
+      JSON_OUTPUT: "true"
+    ports:
+      - "127.0.0.1:${INTERVIEW_HELPER_LOCAL_EMBEDDINGS_PORT:-8081}:80"
+    volumes:
+      - interview-helper-models:/models:ro
+    networks:
+      - local-ai-internal
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=384m,mode=1770,uid=10001,gid=10001
+    init: true
+    pids_limit: 128
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    restart: on-failure:3
+
 volumes:
   interview-helper-postgres:
   interview-helper-models:
   interview-helper-model-state:
+
+networks:
+  local-ai-internal:
+    internal: true

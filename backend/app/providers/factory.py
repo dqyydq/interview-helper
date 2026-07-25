@@ -4,7 +4,9 @@ from app.db.models.common import ProviderType
 from app.db.models.model_connection import ModelConnection
 from app.providers.anthropic_compatible import AnthropicCompatibleProvider
 from app.providers.base import ChatProvider, ProviderError
+from app.providers.embedding_base import EmbeddingProvider
 from app.providers.openai_compatible import OpenAICompatibleProvider
+from app.providers.openai_embedding import OpenAICompatibleEmbeddingProvider
 from app.providers.openai_transcription import OpenAICompatibleTranscriptionProvider
 from app.providers.speech_base import SpeechToTextProvider
 
@@ -44,6 +46,28 @@ def build_transcription_provider(connection: ModelConnection) -> SpeechToTextPro
             message="语音转写连接尚未配置 API Key",
         )
     return OpenAICompatibleTranscriptionProvider(
+        base_url=connection.base_url,
+        api_key=cipher.decrypt(connection.encrypted_api_key),
+        model=connection.model_name,
+        extra_headers=cipher.decrypt_mapping(connection.extra_headers_encrypted),
+    )
+
+
+def build_embedding_provider(connection: ModelConnection) -> EmbeddingProvider:
+    """Build only a dedicated embeddings transport, never a chat fallback."""
+
+    if connection.provider_type != ProviderType.OPENAI_COMPATIBLE:
+        raise ProviderError(
+            code="embedding_provider_unsupported",
+            message="向量检索只支持 OpenAI-compatible 连接",
+        )
+    cipher = SecretCipher(settings.encryption_secret)
+    if not connection.encrypted_api_key:
+        raise ProviderError(
+            code="provider_key_missing",
+            message="向量检索连接尚未配置 API Key",
+        )
+    return OpenAICompatibleEmbeddingProvider(
         base_url=connection.base_url,
         api_key=cipher.decrypt(connection.encrypted_api_key),
         model=connection.model_name,
