@@ -416,7 +416,7 @@ export function KnowledgeBasePage() {
     <section className="knowledge-console" aria-labelledby="knowledge-title">
       <header className="knowledge-heading">
         <div>
-          <span>PERSONAL KNOWLEDGE</span>
+          <span>个人知识库</span>
           <h1 id="knowledge-title">面试知识库</h1>
           <p>题目与简历由你管理。面试规划只检索当前公司、轮次和岗位真正需要的内容。</p>
         </div>

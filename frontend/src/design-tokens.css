@@ -8,6 +8,8 @@
   --ih-color-muted: #666671;
   --ih-color-border: #E5E5EA;
   --ih-color-nav: #0A0A0A;
+  --ih-color-nav-surface: #17171C;
+  --ih-color-nav-border: #303038;
   --ih-color-nav-muted: #B7B7C0;
   --ih-color-accent: #5B5FEF;
   --ih-color-accent-surface: #F0F0FF;
@@ -31,6 +33,10 @@
 
   --ih-radius: 8px;
   --ih-control-height: 40px;
+  --ih-layout-primary-max: 1500px;
+  --ih-shell-topbar-height: 64px;
+  --ih-shell-statusbar-height: 32px;
+  --ih-layout-workspace-gutter: var(--ih-space-4);
   --ih-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ih-duration-short: 160ms;
 }

@@ -113,9 +113,9 @@ export function CommandPalette() {
             aria-labelledby="command-title"
           >
             <header>
-              <span id="command-title">COMMAND INDEX</span>
+              <span id="command-title">快速导航</span>
               <button type="button" onClick={() => setOpen(false)} aria-label="关闭快速搜索">
-                ESC
+                Esc
               </button>
             </header>
             <label>

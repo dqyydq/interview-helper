@@ -289,7 +289,7 @@ export function CompanySelectionPage() {
       <aside className="company-rail" aria-label="公司列表">
         <div className="company-rail-heading">
           <div>
-            <span>INTERVIEW TARGET</span>
+            <span>面试目标</span>
             <h1 id="company-console-title">选择公司</h1>
           </div>
           <button className="icon-button" type="button" aria-label="添加公司" onClick={openCreateCompany}>
@@ -327,7 +327,7 @@ export function CompanySelectionPage() {
 
         {company && !company.is_system && (
           <div className="company-management" aria-label="公司管理">
-            <span>MY COMPANY</span>
+            <span>自定义公司</span>
             <div>
               <button className="text-button" type="button" onClick={openEditCompany}>
                 <Pencil size={14} aria-hidden="true" /> 编辑公司
@@ -343,7 +343,7 @@ export function CompanySelectionPage() {
       <main className="round-workspace">
         <header className="round-workspace-heading">
           <div>
-            <span>ROUND PROFILE</span>
+            <span>轮次档案</span>
             <h2>选择面试轮次</h2>
           </div>
           <div className="round-heading-actions">
@@ -401,8 +401,8 @@ export function CompanySelectionPage() {
               {canManageRounds && round ? (
                 <section className="round-management-panel" aria-label="轮次管理">
                   <div>
-                    <span>ROUND CONTROL</span>
-                    <p>Position {round.sequence}。用上下移动调整轮次顺序，避免把面试阶段写死为一二三面。</p>
+                    <span>轮次管理</span>
+                    <p>第 {round.sequence} 轮。用上下移动调整轮次顺序，避免把面试阶段写死为一二三面。</p>
                   </div>
                   <div className="round-management-actions">
                     <button
@@ -486,7 +486,7 @@ export function CompanySelectionPage() {
 
       <aside className="style-preview" aria-labelledby="style-preview-title">
         <div className="preview-heading">
-          <span>STYLE PREVIEW</span>
+          <span>风格预览</span>
           <h2 id="style-preview-title">面试官预览</h2>
         </div>
         <section className="style-integrity">
@@ -546,7 +546,7 @@ export function CompanySelectionPage() {
           <form className="console-dialog" aria-modal="true" aria-labelledby="company-dialog-title" role="dialog" onSubmit={submitCompany}>
             <div className="dialog-heading">
               <div>
-                <span>{companyFormMode === "create" ? "CUSTOM COMPANY" : "COMPANY DETAILS"}</span>
+                <span>{companyFormMode === "create" ? "自定义公司" : "公司信息"}</span>
                 <h2 id="company-dialog-title">{companyFormMode === "create" ? "添加公司骨架" : "编辑公司"}</h2>
               </div>
               <button className="icon-button" type="button" aria-label="关闭" onClick={() => setCompanyFormMode(null)}>
@@ -587,7 +587,7 @@ export function CompanySelectionPage() {
           <form className="console-dialog round-editor-dialog" aria-modal="true" aria-labelledby="round-dialog-title" role="dialog" onSubmit={submitRound}>
             <div className="dialog-heading">
               <div>
-                <span>ROUND PROFILE</span>
+                <span>轮次档案</span>
                 <h2 id="round-dialog-title">{roundFormMode === "create" ? "新增轮次" : "编辑轮次"}</h2>
               </div>
               <button className="icon-button" type="button" aria-label="关闭" onClick={() => setRoundFormMode(null)}>
@@ -661,7 +661,7 @@ export function CompanySelectionPage() {
           <section className="console-dialog confirm-dialog" aria-modal="true" aria-labelledby="archive-dialog-title" role="dialog">
             <div className="dialog-heading">
               <div>
-                <span>ARCHIVE COMPANY</span>
+                <span>归档公司</span>
                 <h2 id="archive-dialog-title">归档 {company.name}</h2>
               </div>
               <button className="icon-button" type="button" aria-label="关闭" onClick={() => setArchiveConfirmOpen(false)}><X size={18} /></button>
@@ -681,7 +681,7 @@ export function CompanySelectionPage() {
           <section className="console-dialog confirm-dialog" aria-modal="true" aria-labelledby="delete-round-dialog-title" role="dialog">
             <div className="dialog-heading">
               <div>
-                <span>DELETE ROUND</span>
+                <span>删除轮次</span>
                 <h2 id="delete-round-dialog-title">删除 {roundPendingDeletion.name}</h2>
               </div>
               <button className="icon-button" type="button" aria-label="关闭" onClick={() => setRoundPendingDeletion(undefined)}><X size={18} /></button>

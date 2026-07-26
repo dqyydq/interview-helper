@@ -401,7 +401,7 @@ export function QuestionDiscoveryPage() {
     <section className="discovery-console" aria-labelledby="discovery-title">
       <header className="discovery-heading">
         <div>
-          <span>QUESTION DISCOVERY</span>
+          <span>题目发现</span>
           <h1 id="discovery-title">发现题目</h1>
           <p>从可追溯的公开资料整理候选题，审核后再进入你的个人题库。</p>
         </div>
@@ -417,7 +417,7 @@ export function QuestionDiscoveryPage() {
         <aside className="discovery-run-rail" aria-label="发现任务历史">
           <div className="discovery-rail-heading">
             <div>
-              <span>RUN HISTORY</span>
+              <span>发现记录</span>
               <h2>发现记录</h2>
             </div>
             <button
@@ -478,7 +478,7 @@ export function QuestionDiscoveryPage() {
           <form className="discovery-form" onSubmit={submitDiscovery}>
             <div className="discovery-form-heading">
               <div>
-                <span>NEW RUN</span>
+                <span>新建任务</span>
                 <h2>收集候选题</h2>
               </div>
               <div className="discovery-mode-switch" role="tablist" aria-label="发现来源模式">
@@ -627,7 +627,7 @@ export function QuestionDiscoveryPage() {
             <section className="discovery-review" aria-labelledby="discovery-review-title">
               <header className="discovery-review-heading">
                 <div>
-                  <span>RUN REVIEW</span>
+                  <span>任务审核</span>
                   <h2 id="discovery-review-title">{describeRun(selectedRun)}</h2>
                 </div>
                 <div className="discovery-review-actions">
@@ -655,8 +655,8 @@ export function QuestionDiscoveryPage() {
               <div className="discovery-review-grid">
                 <section className="discovery-candidates" aria-labelledby="candidate-list-title">
                   <div className="discovery-section-heading">
-                    <div><span>CANDIDATE REVIEW</span><h3 id="candidate-list-title">候选题</h3></div>
-                    <small>{candidates.data?.count ?? 0} ENTRIES</small>
+                    <div><span>候选审核</span><h3 id="candidate-list-title">候选题</h3></div>
+                    <small>{candidates.data?.count ?? 0} 条</small>
                   </div>
                   {candidates.isLoading && <p className="discovery-list-empty">正在读取候选题。</p>}
                   {!candidates.isLoading && candidates.data?.data.length === 0 && (
@@ -713,8 +713,8 @@ export function QuestionDiscoveryPage() {
 
                 <aside className="discovery-sources" aria-labelledby="source-list-title">
                   <div className="discovery-section-heading">
-                    <div><span>SOURCE LEDGER</span><h3 id="source-list-title">来源</h3></div>
-                    <small>{sources.data?.count ?? 0} SOURCES</small>
+                    <div><span>来源记录</span><h3 id="source-list-title">来源</h3></div>
+                    <small>{sources.data?.count ?? 0} 个来源</small>
                   </div>
                   {sources.isLoading && <p className="discovery-list-empty">正在读取来源。</p>}
                   <div className="discovery-source-list">
@@ -747,7 +747,7 @@ export function QuestionDiscoveryPage() {
 
               <footer className="discovery-import-bar">
                 <div>
-                  <span>IMPORT TO QUESTION BANK</span>
+                  <span>导入题库</span>
                   <strong>{selectedCandidates.length === 0 ? "选择候选题后导入" : `已选择 ${selectedCandidates.length} 道候选题`}</strong>
                 </div>
                 <label>
@@ -774,7 +774,7 @@ export function QuestionDiscoveryPage() {
           <section className="console-dialog discovery-evidence-dialog" role="dialog" aria-modal="true" aria-labelledby="discovery-evidence-title">
             <div className="dialog-heading">
               <div>
-                <span>TRACEABLE EVIDENCE</span>
+                <span>证据溯源</span>
                 <h2 id="discovery-evidence-title">候选题来源证据</h2>
               </div>
               <button className="icon-button" type="button" aria-label="关闭候选题证据" onClick={() => setSelectedEvidenceCandidate(undefined)}><X size={18} /></button>

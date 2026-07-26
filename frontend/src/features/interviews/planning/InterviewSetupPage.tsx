@@ -145,7 +145,7 @@ export function InterviewSetupPage() {
           <ArrowLeft size={15} /> 返回公司选择
         </button>
         <div>
-          <span>INTERVIEW SETUP / 02</span>
+          <span>本场配置 · 02</span>
           <h1 id="setup-title">配置本场模拟</h1>
           <p>{company.name} · {round.name} · {company.latest_style_pack?.evidence_label}</p>
         </div>
@@ -241,7 +241,7 @@ export function InterviewSetupPage() {
 
         <aside className="plan-preview" aria-live="polite">
           <div className="plan-preview-heading">
-            <span>EXPLAINABLE PLAN</span>
+            <span>计划说明</span>
             <h2>计划预览</h2>
           </div>
           {!plan && (

@@ -25,7 +25,7 @@ describe("CommandPalette", () => {
     renderPalette();
 
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
-    expect(screen.getByRole("dialog", { name: "COMMAND INDEX" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "快速导航" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("搜索页面"), { target: { value: "证据" } });
     expect(screen.getByRole("button", { name: /评估报告/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /评估报告/ }));

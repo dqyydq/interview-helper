@@ -92,13 +92,13 @@ test("uses the shared typography scale across primary workspaces", async ({ page
 
   await page.goto("/interviews");
   await expect(page.locator(".company-rail-heading h1")).toBeVisible();
-  expect(await fontSize(page, '.primary-nav a[href="/interviews"]')).toBe(13);
-  expect(await fontSize(page, ".statusbar")).toBe(12);
-  expect(await fontSize(page, ".company-rail-heading h1")).toBe(18);
+  expect(await fontSize(page, '.primary-nav a[href="/interviews"]')).toBe(14);
+  expect(await fontSize(page, ".statusbar")).toBe(14);
+  expect(await fontSize(page, ".company-rail-heading h1")).toBe(24);
 
   await page.goto("/questions");
   await expect(page.locator(".knowledge-heading h1")).toBeVisible();
-  expect(await fontSize(page, ".knowledge-heading h1")).toBe(48);
+  expect(await fontSize(page, ".knowledge-heading h1")).toBe(24);
   expect(await fontSize(page, ".knowledge-tabs button.active")).toBe(14);
   expect(await fontSize(page, ".search-field input")).toBe(14);
 

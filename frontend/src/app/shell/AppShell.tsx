@@ -20,7 +20,7 @@ export function AppShell({ children }: PropsWithChildren) {
             IH
           </span>
           <span>
-            <strong>INTERVIEW HELPER</strong>
+            <strong>Interview Helper</strong>
             <small>开源 · AI 模拟面试</small>
           </span>
         </NavLink>
@@ -57,7 +57,7 @@ export function AppShell({ children }: PropsWithChildren) {
       </main>
       <footer className="statusbar">
         <span>Interview Helper v0.1.0</span>
-        <span>LOCAL-FIRST / MIT</span>
+        <span>本地优先 · MIT</span>
       </footer>
     </div>
   );

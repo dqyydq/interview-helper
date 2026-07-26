@@ -105,19 +105,19 @@ export function LiveInterviewPage() {
   return (
     <section className="live-room" aria-labelledby="live-room-title">
       <header className="live-header">
-        <div><span>LIVE INTERVIEW / 03</span><h1 id="live-room-title">实时模拟面试</h1></div>
+        <div><span>实时面试 · 03</span><h1 id="live-room-title">实时模拟面试</h1></div>
         <div className={`connection-indicator ${connection}`}><i />{connection === "connected" ? "连接正常" : "正在恢复连接"}</div>
         <div className="live-metrics"><span><Clock3 size={14} />{timerLabel}</span><span>{current} / {total} 题</span></div>
       </header>
       <main className="live-transcript">
-        <div className="transcript-rule"><span>TRANSCRIPT</span><strong>面试中不显示评分</strong></div>
+        <div className="transcript-rule"><span>对话记录</span><strong>面试中不显示评分</strong></div>
         {messages.map((message) => (
           <article key={message.id} className={`transcript-message ${message.role}`}>
-            <span>{message.role === "assistant" ? "INTERVIEWER" : "YOU"}</span>
+            <span>{message.role === "assistant" ? "面试官" : "你"}</span>
             <p>{message.content}</p>
           </article>
         ))}
-        {streaming && <article className="transcript-message assistant streaming"><span>INTERVIEWER</span><p>{streaming}<i /></p></article>}
+        {streaming && <article className="transcript-message assistant streaming"><span>面试官</span><p>{streaming}<i /></p></article>}
         {error && <div className="live-error">{error}。你的回答已保存，可配置模型后继续。</div>}
       </main>
       <aside className="live-side">
@@ -173,7 +173,7 @@ export function LiveInterviewPage() {
         <textarea id="answer-text" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={busy || status !== "interviewing" || connection !== "connected"} placeholder="先给结论，再说明依据、取舍与边界。" />
         <div><small>{draft.length} / 50000</small><button className="primary-button" type="submit" disabled={!draft.trim() || busy || connection !== "connected"}><Send size={15} />{busy ? "等待面试官" : "确认回答"}</button></div>
       </form>
-      <footer className="live-footer"><button className="text-button" type="button" onClick={() => navigate("/interviews")}>退出房间</button><span>SESSION {sessionId.slice(0, 8).toUpperCase()}</span></footer>
+      <footer className="live-footer"><button className="text-button" type="button" onClick={() => navigate("/interviews")}>退出房间</button><span>会话 {sessionId.slice(0, 8).toUpperCase()}</span></footer>
     </section>
   );
 }

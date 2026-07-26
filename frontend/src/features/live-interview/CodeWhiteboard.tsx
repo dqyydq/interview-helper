@@ -106,7 +106,7 @@ export function CodeWhiteboard({
     <section className="code-whiteboard" aria-label="代码白板">
       <header>
         <div>
-          <span>CODE ATTACHMENT</span>
+          <span>代码附件</span>
           <strong>代码白板</strong>
         </div>
         <button type="button" aria-label="关闭代码白板" onClick={() => setOpen(false)}>

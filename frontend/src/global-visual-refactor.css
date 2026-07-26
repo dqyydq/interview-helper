@@ -1,0 +1,502 @@
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4
+ * Hallmark · genre: modern-minimal · macrostructure: Workbench · designed-as-app
+ * Global shell and shared workspace layer. It is intentionally imported after
+ * feature styles so the legacy console pages inherit one stable system. */
+
+:root {
+  --color-accent: var(--ih-color-accent);
+  --color-accent-strong: var(--ih-color-accent);
+  --color-border: var(--ih-color-border);
+  --color-border-strong: var(--ih-color-border);
+  --color-muted: var(--ih-color-muted);
+  --color-ink: var(--ih-color-ink);
+  --color-surface: var(--ih-color-surface);
+  --color-surface-alt: var(--ih-color-page);
+  --color-report-accent: var(--ih-color-accent);
+  --color-report-focus: var(--ih-color-focus);
+
+  --font-ui: var(--ih-font-sans);
+  --text-micro: var(--ih-text-body);
+  --text-meta: var(--ih-text-body);
+  --text-label: var(--ih-text-body);
+  --text-control: var(--ih-text-body);
+  --text-body: var(--ih-text-body);
+  --text-body-lg: var(--ih-text-body);
+  --text-heading-sm: var(--ih-text-h2);
+  --text-heading: var(--ih-text-h2);
+  --text-section: var(--ih-text-h1);
+  --text-page-title: var(--ih-text-h1);
+  --text-document-title: var(--ih-text-h1);
+  --leading-control: var(--ih-leading);
+  --leading-heading: var(--ih-leading);
+  --leading-display: var(--ih-leading);
+  --leading-body: var(--ih-leading);
+  --tracking-display: 0;
+  --tracking-label: 0;
+  --tracking-kicker: 0;
+  --layout-workspace-gutter: var(--ih-layout-workspace-gutter);
+  --layout-primary-max-inline: var(--ih-layout-primary-max);
+  --layout-primary-min-block: min(
+    760px,
+    calc(
+      100dvh - var(--ih-shell-topbar-height) - var(--ih-shell-statusbar-height) -
+        var(--layout-fixed-navigation-block) - var(--layout-workspace-gutter) -
+        var(--layout-workspace-gutter)
+    )
+  );
+}
+
+html,
+body {
+  overflow-x: clip;
+  color: var(--ih-color-ink);
+  background: var(--ih-color-page);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.app-shell {
+  grid-template-rows: var(--ih-shell-topbar-height) minmax(0, 1fr) var(--ih-shell-statusbar-height);
+  color: var(--ih-color-ink);
+  background: var(--ih-color-page);
+}
+
+.topbar {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px) auto minmax(0, 1fr);
+  min-width: 0;
+  padding-inline: var(--ih-space-4);
+  color: var(--ih-color-accent-foreground);
+  background: var(--ih-color-nav);
+  border-color: var(--ih-color-nav-border);
+}
+
+.brand {
+  gap: var(--ih-space-2);
+}
+
+.brand-mark {
+  width: var(--ih-control-height);
+  height: var(--ih-control-height);
+  color: var(--ih-color-accent-foreground);
+  background: var(--ih-color-accent);
+  border-radius: var(--ih-radius);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-h2);
+  letter-spacing: 0;
+}
+
+.brand strong {
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-h2);
+  font-style: normal;
+  letter-spacing: 0;
+  line-height: var(--ih-leading);
+}
+
+.brand small {
+  margin-top: 0;
+  color: var(--ih-color-nav-muted);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  letter-spacing: 0;
+  line-height: var(--ih-leading);
+}
+
+.command-trigger {
+  height: var(--ih-control-height);
+  gap: var(--ih-space-2);
+  padding-inline: var(--ih-space-3);
+  color: var(--ih-color-nav-muted);
+  background: var(--ih-color-nav-surface);
+  border-color: var(--ih-color-nav-border);
+  border-radius: var(--ih-radius);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.command-trigger:hover,
+.command-trigger:focus-visible {
+  color: var(--ih-color-accent-foreground);
+  border-color: var(--ih-color-accent);
+}
+
+.command-trigger:focus-visible,
+.nav-link:focus-visible,
+.command-palette :is(button, input):focus-visible {
+  outline: 2px solid var(--ih-color-focus);
+  outline-offset: 2px;
+}
+
+.command-trigger span,
+.command-trigger kbd {
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.command-trigger kbd {
+  padding: var(--ih-space-1) var(--ih-space-2);
+  color: var(--ih-color-nav-muted);
+  background: var(--ih-color-nav);
+  border-color: var(--ih-color-nav-border);
+  border-radius: var(--ih-radius);
+  font-family: var(--ih-font-sans);
+}
+
+.command-backdrop {
+  padding: calc(var(--ih-space-5) * 2) var(--ih-space-3) var(--ih-space-5);
+  background: var(--ih-color-backdrop);
+}
+
+.command-palette {
+  color: var(--ih-color-ink);
+  background: var(--ih-color-surface);
+  border-color: var(--ih-color-border);
+  border-radius: var(--ih-radius);
+  box-shadow: var(--ih-shadow-card);
+  overflow: clip;
+}
+
+.command-palette > header {
+  min-height: var(--ih-control-height);
+  padding-inline: var(--ih-space-3);
+  color: var(--ih-color-muted);
+  border-color: var(--ih-color-border);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  letter-spacing: 0;
+  line-height: var(--ih-leading);
+}
+
+.command-palette > header button {
+  min-height: var(--ih-control-height);
+  padding-inline: var(--ih-space-2);
+  color: var(--ih-color-muted);
+  border-color: var(--ih-color-border);
+  border-radius: var(--ih-radius);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+}
+
+.command-palette > label {
+  min-height: calc(var(--ih-control-height) + var(--ih-space-3));
+  gap: var(--ih-space-2);
+  padding-inline: var(--ih-space-3);
+  color: var(--ih-color-accent);
+  border-color: var(--ih-color-border);
+}
+
+.command-palette > label input {
+  height: var(--ih-control-height);
+  color: var(--ih-color-ink);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.command-palette > label input::placeholder {
+  color: var(--ih-color-muted);
+}
+
+.command-results {
+  padding: var(--ih-space-2);
+}
+
+.command-results > button {
+  min-height: calc(var(--ih-control-height) + var(--ih-space-4));
+  gap: var(--ih-space-2);
+  padding: var(--ih-space-2) var(--ih-space-3);
+  color: var(--ih-color-ink);
+  border-radius: var(--ih-radius);
+  font-family: var(--ih-font-sans);
+}
+
+.command-results > button:hover,
+.command-results > button:focus-visible {
+  color: var(--ih-color-accent);
+  background: var(--ih-color-accent-surface);
+  border-color: var(--ih-color-accent);
+}
+
+.command-results :is(strong, small, .command-index),
+.command-results > p {
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  letter-spacing: 0;
+  line-height: var(--ih-leading);
+}
+
+.command-results small,
+.command-index,
+.command-results > p {
+  color: var(--ih-color-muted);
+}
+
+.primary-nav {
+  min-width: 0;
+}
+
+.nav-link {
+  min-width: 0;
+  padding-inline: var(--ih-space-3);
+  color: var(--ih-color-nav-muted);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.nav-link span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: var(--ih-color-accent-foreground);
+  background: var(--ih-color-nav-surface);
+}
+
+.nav-link.active::after {
+  right: var(--ih-space-3);
+  left: var(--ih-space-3);
+  background: var(--ih-color-accent);
+}
+
+.github-link {
+  gap: var(--ih-space-2);
+  color: var(--ih-color-nav-muted);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.github-link:hover {
+  color: var(--ih-color-accent-foreground);
+}
+
+.workspace {
+  padding: var(--layout-workspace-gutter);
+  background: var(--ih-color-page);
+}
+
+.workspace-frame {
+  width: min(100%, var(--ih-layout-primary-max));
+  min-height: var(--layout-primary-min-block);
+}
+
+.workspace-frame :is(
+  .company-console,
+  .knowledge-console,
+  .interview-setup,
+  .live-room,
+  .diagnostics-page,
+  .discovery-console,
+  .settings-console,
+  .report-index,
+  .report-progress,
+  .interview-report,
+  .empty-state,
+  .not-found,
+  .code-whiteboard
+) {
+  border-color: var(--ih-color-border);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-surface);
+  overflow: clip;
+}
+
+.workspace-frame :is(
+  .company-rail,
+  .style-preview,
+  .bank-sidebar,
+  .plan-preview,
+  .live-side,
+  .diagnostics-actions,
+  .discovery-run-rail
+) {
+  border-color: var(--ih-color-border);
+  background: var(--ih-color-page);
+}
+
+.workspace-frame .diagnostics-grid > article {
+  border-color: var(--ih-color-border);
+  background: var(--ih-color-surface);
+}
+
+.workspace-frame :is(h1, h2, h3, h4) {
+  min-width: 0;
+  color: var(--ih-color-ink);
+  font-family: var(--ih-font-sans);
+  font-style: normal;
+  letter-spacing: 0;
+  line-height: var(--ih-leading);
+  overflow-wrap: anywhere;
+}
+
+.workspace-frame h1 {
+  font-size: var(--ih-text-h1);
+}
+
+.workspace-frame :is(h2, h3, h4) {
+  font-size: var(--ih-text-h2);
+}
+
+.workspace-frame :is(
+  .company-console,
+  .knowledge-console,
+  .interview-setup,
+  .live-room,
+  .diagnostics-page,
+  .discovery-console,
+  .settings-console,
+  .report-index,
+  .report-progress,
+  .interview-report,
+  .empty-state,
+  .not-found,
+  .code-whiteboard
+) :is(
+  p,
+  li,
+  label,
+  small,
+  dt,
+  dd,
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea:not(.cm-textarea),
+  button
+) {
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  letter-spacing: 0;
+  line-height: var(--ih-leading);
+}
+
+.workspace-frame :is(
+  .eyebrow,
+  .company-rail-heading span,
+  .round-workspace-heading > div > span,
+  .preview-heading > span,
+  .dialog-heading span,
+  .knowledge-heading > div > span,
+  .setup-header > div > span,
+  .plan-preview-heading span,
+  .live-header > div:first-child span,
+  .transcript-rule span,
+  .transcript-message > span,
+  .live-footer span,
+  .diagnostics-actions > span,
+  .diagnostics-grid > article > header span,
+  .discovery-heading > div > span,
+  .discovery-form-heading span,
+  .discovery-rail-heading span,
+  .discovery-review-heading span,
+  .discovery-section-heading span,
+  .discovery-import-bar span,
+  .discovery-evidence-list header span,
+  .discovery-evidence-list header small,
+  .report-index > header span,
+  .report-hero > div > span,
+  .report-outline > span,
+  .report-trend > span,
+  .coach-panel header span,
+  .evidence-drawer header span,
+  .code-whiteboard > header span,
+  .code-whiteboard > footer span
+) {
+  color: var(--ih-color-muted);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: var(--ih-leading);
+}
+
+.workspace-frame :is(
+  button,
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea:not(.cm-textarea)
+) {
+  border-radius: var(--ih-radius);
+}
+
+.workspace-frame :is(
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea:not(.cm-textarea)
+) {
+  color: var(--ih-color-ink);
+  border-color: var(--ih-color-border);
+  background: var(--ih-color-surface);
+}
+
+.workspace-frame :is(
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea:not(.cm-textarea)
+):focus-visible {
+  border-color: var(--ih-color-accent);
+  outline: 2px solid var(--ih-color-focus);
+  outline-offset: 2px;
+}
+
+.statusbar {
+  min-height: var(--ih-shell-statusbar-height);
+  padding-inline: var(--ih-space-4);
+  color: var(--ih-color-nav-muted);
+  background: var(--ih-color-nav);
+  border-color: var(--ih-color-nav-border);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+@media (max-width: 1100px) {
+  :root {
+    --layout-workspace-gutter: var(--ih-space-3);
+  }
+
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-inline: var(--ih-space-3);
+  }
+
+  .primary-nav {
+    z-index: 2;
+    height: var(--ih-shell-topbar-height);
+    background: var(--ih-color-nav);
+    border-top: 1px solid var(--ih-color-nav-border);
+  }
+
+  .nav-link {
+    flex: 1;
+    padding-inline: var(--ih-space-2);
+  }
+
+  .app-shell {
+    padding-bottom: var(--ih-shell-topbar-height);
+  }
+}
+
+@media (max-width: 620px) {
+  .brand small,
+  .github-link span,
+  .statusbar span:last-child {
+    display: none;
+  }
+
+  .nav-link {
+    gap: var(--ih-space-1);
+    flex-direction: column;
+  }
+
+  .nav-link.active::after {
+    right: var(--ih-space-3);
+    left: var(--ih-space-3);
+  }
+}
