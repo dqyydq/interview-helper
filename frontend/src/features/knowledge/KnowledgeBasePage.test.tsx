@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,7 @@ vi.mock("./api", () => ({
   knowledgeApi: {
     listBanks: vi.fn(),
     createBank: vi.fn(),
+    archiveBank: vi.fn(),
     listQuestions: vi.fn(),
     createQuestion: vi.fn(),
     archiveQuestion: vi.fn(),
@@ -51,6 +52,7 @@ describe("KnowledgeBasePage", () => {
 
   beforeEach(() => {
     vi.mocked(knowledgeApi.listBanks).mockResolvedValue([bank]);
+    vi.mocked(knowledgeApi.archiveBank).mockResolvedValue(undefined);
     vi.mocked(knowledgeApi.listQuestions).mockResolvedValue({
       data: [],
       count: 0,
@@ -131,6 +133,21 @@ describe("KnowledgeBasePage", () => {
         tag_names: ["Agent", "上下文工程"],
       }),
       expect.anything(),
+    );
+  });
+
+  it("archives the active question bank after an explicit confirmation", async () => {
+    renderPage();
+
+    expect(await screen.findByText("LLM 应用开发")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "归档当前题库" }));
+
+    const dialog = screen.getByRole("dialog", { name: "归档 LLM 应用开发" });
+    expect(dialog).toHaveTextContent("0 道题目");
+    fireEvent.click(within(dialog).getByRole("button", { name: "确认归档" }));
+
+    await waitFor(() =>
+      expect(knowledgeApi.archiveBank).toHaveBeenCalledWith("bank-1", expect.anything()),
     );
   });
 

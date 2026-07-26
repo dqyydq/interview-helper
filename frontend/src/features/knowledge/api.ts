@@ -19,6 +19,8 @@ export const knowledgeApi = {
       method: "POST",
       body: JSON.stringify({ name }),
     }),
+  archiveBank: (bankId: string) =>
+    apiRequest<void>(`/question-banks/${bankId}`, { method: "DELETE" }),
   listQuestions: (query: QuestionListQuery = {}) => {
     const params = new URLSearchParams();
     if (query.bankId) params.set("bank_id", query.bankId);

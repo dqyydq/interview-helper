@@ -50,6 +50,7 @@ vi.mock("../features/knowledge/api", () => ({
   knowledgeApi: {
     listBanks: vi.fn().mockResolvedValue([]),
     createBank: vi.fn(),
+    archiveBank: vi.fn(),
     listQuestions: vi.fn().mockResolvedValue({ data: [], count: 0, offset: 0, limit: 100 }),
     createQuestion: vi.fn(),
     archiveQuestion: vi.fn(),

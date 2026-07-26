@@ -25,6 +25,7 @@ import type {
   BackgroundJob,
   Difficulty,
   Question,
+  QuestionBank,
   QuestionDraft,
   QuestionSortField,
   QuestionStatus,
@@ -151,12 +152,14 @@ export function KnowledgeBasePage() {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [bankFormOpen, setBankFormOpen] = useState(false);
   const [bankName, setBankName] = useState("");
+  const [bankPendingArchive, setBankPendingArchive] = useState<QuestionBank>();
   const [questionDraft, setQuestionDraft] = useState<QuestionFormState>(emptyQuestionForm);
   const [variantPrompt, setVariantPrompt] = useState("");
   const [variantType, setVariantType] = useState("paraphrase");
 
   const banks = useQuery({ queryKey: ["question-banks"], queryFn: knowledgeApi.listBanks });
-  const activeBankId = selectedBankId ?? banks.data?.[0]?.id;
+  const activeBank = banks.data?.find((bank) => bank.id === selectedBankId) ?? banks.data?.[0];
+  const activeBankId = activeBank?.id;
   const questions = useQuery({
     queryKey: [
       "questions",
@@ -220,6 +223,21 @@ export function KnowledgeBasePage() {
       setBankName("");
       setBankFormOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["question-banks"] });
+    },
+  });
+  const archiveBank = useMutation({
+    mutationFn: knowledgeApi.archiveBank,
+    onSuccess: async (_result, archivedBankId) => {
+      const nextBankId = banks.data?.find((bank) => bank.id !== archivedBankId)?.id;
+      setSelectedBankId(nextBankId);
+      setBankPendingArchive(undefined);
+      setSelectedQuestionIds([]);
+      setOffset(0);
+      closeQuestionForm();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["question-banks"] }),
+        queryClient.invalidateQueries({ queryKey: ["questions"] }),
+      ]);
     },
   });
   const createQuestion = useMutation({
@@ -479,6 +497,16 @@ export function KnowledgeBasePage() {
                 </button>
               ))}
             </div>
+            {activeBank && (
+              <button
+                className="text-button"
+                type="button"
+                disabled={archiveBank.isPending}
+                onClick={() => setBankPendingArchive(activeBank)}
+              >
+                <Archive size={15} aria-hidden="true" /> 归档当前题库
+              </button>
+            )}
             {!banks.isLoading && banks.data?.length === 0 && (
               <div className="sidebar-empty">
                 <p>还没有题库。</p>
@@ -806,6 +834,33 @@ export function KnowledgeBasePage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {bankPendingArchive && (
+        <div className="dialog-backdrop" role="presentation">
+          <section className="console-dialog" aria-modal="true" aria-labelledby="archive-bank-dialog-title" role="dialog">
+            <div className="dialog-heading">
+              <div>
+                <span>题库管理</span>
+                <h2 id="archive-bank-dialog-title">归档 {bankPendingArchive.name}</h2>
+              </div>
+              <button className="icon-button" type="button" aria-label="关闭" onClick={() => setBankPendingArchive(undefined)}>
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+            <p>
+              归档后，这个题库及其中的 {bankPendingArchive.question_count} 道题目将不再出现在日常选择和后续面试规划中。
+              题目与历史记录不会被物理删除。
+            </p>
+            {archiveBank.isError && <p className="inline-error">归档失败，请稍后重试。</p>}
+            <div className="dialog-actions">
+              <button className="secondary-button" type="button" disabled={archiveBank.isPending} onClick={() => setBankPendingArchive(undefined)}>取消</button>
+              <button className="danger-button" type="button" disabled={archiveBank.isPending} onClick={() => archiveBank.mutate(bankPendingArchive.id)}>
+                {archiveBank.isPending ? "正在归档" : "确认归档"}
+              </button>
+            </div>
+          </section>
         </div>
       )}
     </section>
