@@ -22,12 +22,27 @@ app = FastAPI(
 )
 
 
+def _message_text(message: dict[str, Any]) -> str:
+    """Extract text from either legacy string content or multimodal content blocks."""
+
+    content = message.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(
+            str(block.get("text") or "")
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        )
+    return ""
+
+
 def _last_json_message(payload: MockChatRequest) -> dict[str, Any]:
     for message in reversed(payload.messages):
         if message.get("role") != "user":
             continue
         try:
-            value = json.loads(str(message.get("content") or ""))
+            value = json.loads(_message_text(message))
         except json.JSONDecodeError:
             continue
         if isinstance(value, dict):
@@ -232,7 +247,7 @@ def _completion_text(payload: MockChatRequest) -> str:
     if {"questions", "rationale", "capability_coverage"} <= properties:
         return json.dumps(_planner_result(source), ensure_ascii=False)
 
-    last_content = str(payload.messages[-1].get("content") or "") if payload.messages else ""
+    last_content = _message_text(payload.messages[-1]) if payload.messages else ""
     if last_content.strip().casefold() == "ping":
         return "pong"
     return "请先给出你的结论，再说明关键指标、技术取舍、失败处理与上线后的验证方法。"

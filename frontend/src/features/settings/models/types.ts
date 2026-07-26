@@ -10,6 +10,7 @@ export const modelRoles = [
   "planner",
   "context_summarizer",
   "researcher",
+  "vision_researcher",
   "coach",
   "embedding",
   "transcriber",

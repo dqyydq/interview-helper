@@ -33,6 +33,7 @@ const roleLabels: Record<ModelRole, string> = {
   planner: "面试规划",
   context_summarizer: "上下文压缩",
   researcher: "公司研究",
+  vision_researcher: "视觉资料解析",
   coach: "训练教练",
   embedding: "向量检索",
   transcriber: "语音转写",
@@ -53,6 +54,7 @@ const initialDraft: ConnectionDraft = {
 };
 
 const sharedEmbeddingEndpointKeys = new Set(["multilingual-e5-small", "bge-m3"]);
+const rolesRequiringExplicitBinding = new Set<ModelRole>(["vision_researcher"]);
 
 function statusLabel(status: ModelConnection["status"]) {
   return {
@@ -693,6 +695,7 @@ export function ModelSettingsPage() {
             {modelRoles.map((role) => {
               const binding = bindings.data?.find((item) => item.role === role);
               const required = role === "interviewer" || role === "evaluator";
+              const requiresExplicitBinding = rolesRequiringExplicitBinding.has(role);
               const roleConnections = role === "transcriber" || role === "embedding"
                 ? connections.data?.filter(
                     (connection) => connection.provider_type === "openai_compatible",
@@ -714,7 +717,7 @@ export function ModelSettingsPage() {
                 <label className="role-row" key={role}>
                   <span>
                     <strong>{roleLabels[role]}</strong>
-                    <small>{required ? "必需" : "可选"}</small>
+                    <small>{required ? "必需" : requiresExplicitBinding ? "按需" : "可选"}</small>
                   </span>
                   <span className="role-target-control">
                     <select
@@ -734,7 +737,9 @@ export function ModelSettingsPage() {
                         }
                       }}
                     >
-                      <option value="">{required ? "请选择连接" : "使用回退策略"}</option>
+                      <option value="">
+                        {required || requiresExplicitBinding ? "请选择连接" : "使用回退策略"}
+                      </option>
                       {roleConnections?.map((connection) => (
                         <option key={connection.id} value={connection.id}>
                           {connection.name} · {connection.model_name}

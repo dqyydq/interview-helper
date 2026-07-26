@@ -178,6 +178,7 @@ class ProviderType(StrEnum):
 
 class ModelRole(StrEnum):
     RESEARCHER = "researcher"
+    VISION_RESEARCHER = "vision_researcher"
     PLANNER = "planner"
     CONTEXT_SUMMARIZER = "context_summarizer"
     INTERVIEWER = "interviewer"

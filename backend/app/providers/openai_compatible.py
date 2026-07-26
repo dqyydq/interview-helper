@@ -61,7 +61,19 @@ class OpenAICompatibleProvider(ChatProvider):
 
     @staticmethod
     def _message(message: ChatMessage) -> dict[str, Any]:
-        payload: dict[str, Any] = {"role": message.role.value, "content": message.content}
+        content: str | list[dict[str, Any]] = message.content
+        if message.images:
+            content = []
+            if message.content:
+                content.append({"type": "text", "text": message.content})
+            content.extend(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": image.openai_image_url()},
+                }
+                for image in message.images
+            )
+        payload: dict[str, Any] = {"role": message.role.value, "content": content}
         if message.name:
             payload["name"] = message.name
         if message.tool_call_id:

@@ -576,4 +576,51 @@ describe("ModelSettingsPage", () => {
     fireEvent.click(rebuild);
     await waitFor(() => expect(modelConnectionApi.rebuildEmbeddingIndex).toHaveBeenCalledTimes(1));
   });
+
+  it("requires an explicit visual model binding and can route qwen-compatible connections", async () => {
+    const visionConnection = {
+      id: "connection-qwen-vision",
+      name: "默认视觉解析",
+      provider_type: "openai_compatible" as const,
+      base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      model_name: "qwen3.7-flash",
+      context_window_tokens: 128000,
+      max_output_tokens: 4096,
+      tokenizer_type: "estimated",
+      supports_prompt_caching: false,
+      supports_token_count_endpoint: false,
+      status: "healthy" as const,
+      has_api_key: true,
+    };
+    vi.mocked(modelConnectionApi.list).mockResolvedValue([visionConnection]);
+    vi.mocked(modelConnectionApi.bindRole).mockResolvedValue({
+      id: "binding-vision",
+      role: "vision_researcher",
+      target_kind: "model_connection",
+      connection_id: visionConnection.id,
+      connection_name: visionConnection.name,
+      model_name: visionConnection.model_name,
+      connection_status: "healthy",
+      local_capability_key: null,
+    });
+
+    renderPage();
+
+    const visionSelect = await screen.findByLabelText("视觉资料解析模型");
+    expect(visionSelect).toHaveValue("");
+    expect(within(visionSelect).getByRole("option", { name: "请选择连接" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        within(visionSelect).getByRole("option", { name: "默认视觉解析 · qwen3.7-flash" }),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.change(visionSelect, { target: { value: visionConnection.id } });
+    await waitFor(() =>
+      expect(modelConnectionApi.bindRole).toHaveBeenCalledWith(
+        "vision_researcher",
+        { connection_id: visionConnection.id },
+      ),
+    );
+  });
 });

@@ -209,6 +209,55 @@ async def test_explicit_researcher_role_resolves_its_enabled_connection() -> Non
 
 
 @pytest.mark.asyncio
+async def test_vision_researcher_requires_an_explicit_connection_binding() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        interviewer = await client.post(
+            "/api/model-connections",
+            json=connection_payload("interviewer"),
+        )
+        vision = await client.post(
+            "/api/model-connections",
+            json=connection_payload("vision"),
+        )
+        await client.put(
+            "/api/model-connections/roles/interviewer",
+            json={"connection_id": interviewer.json()["id"]},
+        )
+
+        async with async_session_factory() as session:
+            profile = await service.ensure_local_profile(session)
+            with pytest.raises(AppError) as error:
+                await service.resolve_explicit_role_connection(
+                    session,
+                    profile.id,
+                    ModelRole.VISION_RESEARCHER,
+                )
+
+        bound = await client.put(
+            "/api/model-connections/roles/vision_researcher",
+            json={"connection_id": vision.json()["id"]},
+        )
+
+    assert error.value.code == "model_role_unbound"
+    assert bound.status_code == 200
+    assert bound.json()["role"] == "vision_researcher"
+    assert bound.json()["connection_id"] == vision.json()["id"]
+
+    async with async_session_factory() as session:
+        profile = await service.ensure_local_profile(session)
+        resolved = await service.resolve_explicit_role_connection(
+            session,
+            profile.id,
+            ModelRole.VISION_RESEARCHER,
+        )
+
+    assert str(resolved.id) == vision.json()["id"]
+
+
+@pytest.mark.asyncio
 async def test_deleting_connection_removes_encrypted_secret_and_role_binding() -> None:
     async with AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False),

@@ -6,7 +6,7 @@ from app.api.errors import AppError
 from app.context.token_budget import ContextLayer, TokenBudget
 from app.context.token_counter import UnifiedTokenCounter
 from app.db.models.common import MessageRole
-from app.providers.types import ChatMessage
+from app.providers.types import IMAGE_INPUT_TOKEN_ESTIMATE, ChatImage, ChatMessage
 
 
 def test_unknown_tokenizer_uses_conservative_nonzero_count() -> None:
@@ -21,6 +21,29 @@ def test_unknown_tokenizer_uses_conservative_nonzero_count() -> None:
     assert messages.tokens > text.tokens
     assert text.safety_margin >= 1.15
     assert text.method == "conservative_estimate:unknown"
+
+
+def test_image_attachments_reserve_a_nonzero_conservative_token_budget() -> None:
+    counter = UnifiedTokenCounter("estimated")
+    text_only = counter.count_messages(
+        [ChatMessage(role=MessageRole.USER, content="请分析这份资料")]
+    )
+    with_image = counter.count_messages(
+        [
+            ChatMessage(
+                role=MessageRole.USER,
+                content="请分析这份资料",
+                images=[
+                    ChatImage(
+                        source_type="url",
+                        url="https://assets.example.org/interview.png",
+                    )
+                ],
+            )
+        ]
+    )
+
+    assert with_image.tokens >= text_only.tokens + IMAGE_INPUT_TOKEN_ESTIMATE
 
 
 def test_budget_has_stable_pressure_thresholds_and_layer_targets() -> None:

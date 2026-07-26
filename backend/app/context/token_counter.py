@@ -36,13 +36,18 @@ class UnifiedTokenCounter:
 
     def count_messages(self, messages: list[ChatMessage]) -> CountResult:
         content_tokens = sum(self.count_text(message.content).tokens for message in messages)
+        image_tokens = sum(
+            image.estimated_input_tokens
+            for message in messages
+            for image in message.images
+        )
         tool_tokens = sum(
             self.count_text(json.dumps(call.model_dump(), ensure_ascii=False)).tokens
             for message in messages
             for call in message.tool_calls
         )
         return CountResult(
-            tokens=content_tokens + tool_tokens + (len(messages) * 6),
+            tokens=content_tokens + image_tokens + tool_tokens + (len(messages) * 6),
             method=self.method,
             safety_margin=self.safety_margin,
         )

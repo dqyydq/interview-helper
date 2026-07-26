@@ -6,7 +6,14 @@ import pytest
 from app.db.models.common import MessageRole
 from app.providers.anthropic_compatible import AnthropicCompatibleProvider
 from app.providers.base import ProviderError
-from app.providers.types import ChatMessage, ChatRequest, StreamEventType, ToolCall
+from app.providers.types import (
+    ChatImage,
+    ChatMessage,
+    ChatRequest,
+    ImageMediaType,
+    StreamEventType,
+    ToolCall,
+)
 
 
 @pytest.mark.asyncio
@@ -16,6 +23,7 @@ async def test_anthropic_chat_converts_system_and_tool_blocks() -> None:
         assert request.url.path == "/v1/messages"
         assert request.headers["x-api-key"] == "anthropic-key"
         assert payload["system"] == "system instruction"
+        assert payload["messages"][0]["content"] == "question"
         assert payload["messages"][1]["content"][1]["type"] == "tool_use"
         return httpx.Response(
             200,
@@ -54,6 +62,75 @@ async def test_anthropic_chat_converts_system_and_tool_blocks() -> None:
     assert response.content == "result"
     assert response.tool_calls[0].name == "lookup"
     assert response.usage.total_tokens == 14
+
+
+@pytest.mark.asyncio
+async def test_anthropic_chat_converts_url_and_base64_images_to_content_blocks() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert payload["messages"] == [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "请阅读这两张资料图"},
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "url",
+                            "url": "https://assets.example.org/interview.png",
+                        },
+                    },
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": "aGVsbG8=",
+                        },
+                    },
+                ],
+            }
+        ]
+        return httpx.Response(
+            200,
+            json={
+                "id": "message-vision-1",
+                "content": [{"type": "text", "text": "已解析"}],
+                "stop_reason": "end_turn",
+                "usage": {"input_tokens": 12, "output_tokens": 3},
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = AnthropicCompatibleProvider(
+            base_url="https://anthropic.test/v1",
+            api_key="anthropic-key",
+            model="vision-test",
+            client=client,
+        )
+        response = await provider.chat(
+            ChatRequest(
+                messages=[
+                    ChatMessage(
+                        role=MessageRole.USER,
+                        content="请阅读这两张资料图",
+                        images=[
+                            ChatImage(
+                                source_type="url",
+                                url="https://assets.example.org/interview.png",
+                            ),
+                            ChatImage(
+                                source_type="base64",
+                                media_type=ImageMediaType.PNG,
+                                data="aGVsbG8=",
+                            ),
+                        ],
+                    )
+                ]
+            )
+        )
+
+    assert response.content == "已解析"
 
 
 @pytest.mark.asyncio

@@ -67,6 +67,13 @@ class AnthropicCompatibleProvider(ChatProvider):
             blocks.append({"type": "text", "text": message.content})
         blocks.extend(
             {
+                "type": "image",
+                "source": image.anthropic_source(),
+            }
+            for image in message.images
+        )
+        blocks.extend(
+            {
                 "type": "tool_use",
                 "id": call.id,
                 "name": call.name,
@@ -82,7 +89,7 @@ class AnthropicCompatibleProvider(ChatProvider):
                     "content": message.content,
                 }
             ]
-        return blocks if message.tool_calls else message.content
+        return blocks if message.images or message.tool_calls else message.content
 
     def _payload(self, request: ChatRequest, *, stream: bool) -> dict[str, Any]:
         system_parts = [request.system] if request.system else []
