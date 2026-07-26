@@ -228,6 +228,18 @@ export function CompanySelectionPage() {
     setCompanyFormMode("create");
     setActionError(undefined);
   };
+  const openCreateCompanyFromTemplate = () => {
+    if (!company) {
+      openCreateCompany();
+      return;
+    }
+    setCompanyForm({
+      name: `${company.name}（我的版本）`,
+      description: `基于 ${company.name} 的系统轮次骨架创建的本地草案；请补充可验证来源。`,
+    });
+    setCompanyFormMode("create");
+    setActionError(undefined);
+  };
   const openEditCompany = () => {
     if (!company) return;
     setCompanyForm({ name: company.name, description: company.description ?? "" });
@@ -526,10 +538,16 @@ export function CompanySelectionPage() {
           <span>
             <strong>{company?.name || "未选择公司"} · {round?.name || "未选择轮次"}</strong>
             <small>岗位方向：LLM 应用开发</small>
+            {company?.is_system && <small>当前是无风格证据的系统轮次骨架；创建我的版本后即可编辑公司与轮次。</small>}
           </span>
         </div>
-        <button className="secondary-button" type="button" disabled={!company || company.is_system} onClick={openEditCompany}>
-          调整公司
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={!company}
+          onClick={company?.is_system ? openCreateCompanyFromTemplate : openEditCompany}
+        >
+          {company?.is_system ? "创建我的版本" : "调整公司"}
         </button>
         <button
           className="primary-button"

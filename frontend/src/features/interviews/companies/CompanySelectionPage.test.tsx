@@ -142,6 +142,11 @@ describe("CompanySelectionPage", () => {
     expect(screen.getAllByText("证据不足")).toHaveLength(2);
     expect(screen.getByText(/系统公司只提供轮次骨架/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "新增轮次" })).not.toBeInTheDocument();
+    expect(screen.getByText(/创建我的版本后即可编辑公司与轮次/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "创建我的版本" }));
+    const createDialog = screen.getByRole("dialog", { name: "添加公司骨架" });
+    expect(within(createDialog).getByLabelText("公司名称")).toHaveValue("字节跳动（我的版本）");
   });
 
   it("creates a custom company with an editable three-round draft", async () => {
