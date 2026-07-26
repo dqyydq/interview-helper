@@ -71,12 +71,13 @@ const report: EvaluationReport = {
   job: null,
 };
 
-function renderPage() {
+function renderPage(initialEntry = "/reports/report-1") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/reports/report-1"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
+          <Route path="/reports" element={<InterviewReportPage />} />
           <Route path="/reports/:reportId" element={<InterviewReportPage />} />
         </Routes>
       </MemoryRouter>
@@ -95,6 +96,7 @@ describe("InterviewReportPage", () => {
       this.removeAttribute("open");
     });
     vi.mocked(reportApi.get).mockResolvedValue(report);
+    vi.mocked(reportApi.list).mockResolvedValue([]);
     vi.mocked(reportApi.coach).mockResolvedValue({
       mode: "rewrite",
       title: "更完整的重答",
@@ -115,6 +117,14 @@ describe("InterviewReportPage", () => {
     expect(screen.getByRole("heading", { name: "原回答证据" })).toBeInTheDocument();
     expect(screen.getByText(report.evidence_messages[0].content)).toBeInTheDocument();
     expect(screen.getByText("解释了分层预算")).toBeInTheDocument();
+  });
+
+  it("explains why the report register is empty and offers the next action", async () => {
+    renderPage("/reports");
+
+    expect(await screen.findByRole("heading", { name: "还没有评估报告" })).toBeInTheDocument();
+    expect(screen.getByText("完成一次模拟面试后，系统会根据你的回答生成可回溯的评估结果，并在这里展示。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /开始模拟面试/ })).toHaveAttribute("href", "/interviews");
   });
 
   it("hides trends until two comparable sessions and never shows an offer probability", async () => {

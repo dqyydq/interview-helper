@@ -104,7 +104,7 @@ test("uses the shared typography scale across primary workspaces", async ({ page
 
   await page.goto("/reports");
   await expect(page.locator(".report-index h1")).toBeVisible();
-  expect(await fontSize(page, ".report-index h1")).toBe(48);
+  expect(await fontSize(page, ".report-index h1")).toBe(24);
 
   expect((await frameMetrics(page)).hasHorizontalOverflow).toBe(false);
 });

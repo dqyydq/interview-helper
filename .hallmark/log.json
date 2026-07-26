@@ -1,5 +1,13 @@
 [
   {
+    "date": "2026-07-26",
+    "macrostructure": "Workbench",
+    "theme": "Custom indigo app system",
+    "enrichment": "none",
+    "brief": "Interview Helper report workspace visual refactor",
+    "scope": "app"
+  },
+  {
     "date": "2026-07-19",
     "macrostructure": "Long Document",
     "theme": "Precision Cobalt",

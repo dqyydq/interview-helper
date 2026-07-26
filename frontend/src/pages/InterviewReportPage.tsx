@@ -15,6 +15,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { EmptyState } from "../components/EmptyState";
 import { reportApi } from "../features/reports/api";
 import { CoachPanel } from "../features/reports/CoachPanel";
 import { EvidenceDrawer } from "../features/reports/EvidenceDrawer";
@@ -38,6 +39,13 @@ const dimensionLabels: Record<string, string> = {
   problem_solving: "问题分析",
   communication: "结构表达",
   system_design: "系统设计",
+};
+
+const reportStatusLabels: Record<EvaluationReport["status"], string> = {
+  pending: "等待评估",
+  running: "生成中",
+  failed: "需要重试",
+  completed: "已完成",
 };
 
 function phaseLabel(job: EvaluationJob | null) {
@@ -126,42 +134,58 @@ function ReportIndex({
     <section className="report-index" aria-labelledby="report-index-title">
       <header>
         <div>
-          <span>EVIDENCE REPORT REGISTER</span>
           <h1 id="report-index-title">面试评估报告</h1>
           <p>每条结论都能回到本场原回答。摘要用于恢复对话，不参与评分。</p>
         </div>
         <ShieldCheck size={30} aria-hidden="true" />
       </header>
-      {isLoading && <div className="report-index-skeleton" aria-label="正在加载报告" />}
-      {isError && <p className="report-index-error">报告列表加载失败，请确认后端服务已启动。</p>}
-      {!isLoading && !isError && reports.length === 0 && (
-        <div className="report-index-empty">
-          <FileBarChart size={27} />
-          <h2>还没有评估报告</h2>
-          <p>完成一场模拟面试后，Evaluator 会在后台生成可追溯报告。</p>
-          <Link to="/interviews">开始模拟面试 <ArrowRight size={15} /></Link>
+      {isLoading && (
+        <div className="report-index-loading" role="status">
+          <RefreshCw className="spin" size={24} aria-hidden="true" />
+          <p>正在读取评估报告…</p>
+          <div className="report-index-loading-lines" aria-hidden="true">
+            <span /><span /><span />
+          </div>
         </div>
       )}
-      <div className="report-register">
-        {reports.map((item, index) => (
-          <Link to={`/reports/${item.report_id}`} className="report-register-row" key={item.report_id}>
-            <span className="report-register-index">{String(index + 1).padStart(2, "0")}</span>
-            <div>
-              <div className="report-register-meta">
-                <span>{item.company_name}</span>
-                <span>{item.round_name}</span>
+      {isError && <p className="report-index-error" role="alert">报告列表暂时无法读取，请确认本地服务已启动后重试。</p>}
+      {!isLoading && !isError && reports.length === 0 && (
+        <EmptyState
+          className="report-index-empty"
+          icon={FileBarChart}
+          title="还没有评估报告"
+          description="完成一次模拟面试后，系统会根据你的回答生成可回溯的评估结果，并在这里展示。"
+          action={<Link to="/interviews">开始模拟面试 <ArrowRight size={15} /></Link>}
+        />
+      )}
+      {!isLoading && !isError && reports.length > 0 && (
+        <div className="report-register" aria-label="评估记录">
+          <div className="report-register-header" aria-hidden="true">
+            <span>公司与岗位</span>
+            <span>面试轮次</span>
+            <span>评估摘要</span>
+            <span>状态</span>
+            <span>更新时间</span>
+            <span />
+          </div>
+          {reports.map((item) => (
+            <Link to={`/reports/${item.report_id}`} className="report-register-row" key={item.report_id}>
+              <div className="report-register-identity">
+                <strong>{item.company_name}</strong>
                 <span>{item.role_name}</span>
               </div>
-              <h2>{item.overview || "报告正在生成，结论稍后可见"}</h2>
-              <small>{new Date(item.updated_at).toLocaleString("zh-CN")}</small>
-            </div>
-            <span className={`anchor-badge ${item.overall_anchor}`}>
-              {item.status === "completed" ? anchorLabels[item.overall_anchor] : "生成中"}
-            </span>
-            <ChevronRight size={17} aria-hidden="true" />
-          </Link>
-        ))}
-      </div>
+              <span>{item.round_name}</span>
+              <div className="report-register-summary">
+                <strong>{anchorLabels[item.overall_anchor]}</strong>
+                <span>{item.overview || "报告正在生成，结论稍后可见"}</span>
+              </div>
+              <span className={`report-status ${item.status}`}>{reportStatusLabels[item.status]}</span>
+              <time dateTime={item.updated_at}>{new Date(item.updated_at).toLocaleString("zh-CN")}</time>
+              <ChevronRight size={17} aria-hidden="true" />
+            </Link>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -181,7 +205,7 @@ function ReportProgress({
   return (
     <section className={`report-progress ${failed ? "failed" : ""}`} aria-labelledby="progress-title">
       {failed ? <AlertTriangle size={28} /> : <RefreshCw className="spin" size={28} />}
-      <span>{failed ? "EVALUATION PAUSED" : "EVALUATION IN PROGRESS"}</span>
+      <span>{failed ? "评估已暂停" : "正在生成评估报告"}</span>
       <h1 id="progress-title">{failed ? "评估未能完成" : phaseLabel(job)}</h1>
       <p>
         {failed
@@ -216,12 +240,12 @@ function CompletedReport({ report }: { report: EvaluationReport }) {
       <header className="report-hero">
         <div>
           <Link to="/reports"><ArrowLeft size={14} /> 全部报告</Link>
-          <span>EVIDENCE-BASED INTERVIEW REVIEW</span>
+          <span>可回溯的面试复盘</span>
           <h1 id="report-title">本场能力结论</h1>
           <p>{report.overview}</p>
         </div>
         <div className="report-verdict">
-          <small>OVERALL ANCHOR</small>
+          <small>整体结论</small>
           <strong>{anchorLabels[report.overall_anchor]}</strong>
           <span>{report.questions.length} 道题 · {report.evidence_messages.length} 条原始证据</span>
         </div>
@@ -229,7 +253,7 @@ function CompletedReport({ report }: { report: EvaluationReport }) {
 
       <div className="report-layout">
         <aside className="report-outline" aria-label="报告目录">
-          <span>REPORT INDEX</span>
+          <span>报告目录</span>
           <a href="#report-overview">结论概览</a>
           {report.questions.map((question) => (
             <a href={`#question-${question.id}`} key={question.id}>
@@ -254,7 +278,7 @@ function CompletedReport({ report }: { report: EvaluationReport }) {
 
           <section className="question-review" aria-labelledby="question-review-title">
             <header>
-              <span>QUESTION-BY-QUESTION</span>
+              <span>逐题复盘</span>
               <h2 id="question-review-title">逐题证据时间线</h2>
               <p>结论按冻结计划切分；每个引用都只指向本场已确认的原回答。</p>
             </header>
@@ -291,7 +315,7 @@ function CompletedReport({ report }: { report: EvaluationReport }) {
           <section id="practice-plan" className="practice-plan">
             <header>
               <ListChecks size={19} />
-              <div><span>NEXT PRACTICE</span><h2>专项练习计划</h2></div>
+              <div><span>专项练习</span><h2>专项练习计划</h2></div>
             </header>
             <ol>
               {report.action_plan.map((action) => (
@@ -310,7 +334,7 @@ function CompletedReport({ report }: { report: EvaluationReport }) {
 
         <aside className="report-analysis">
           <section className="dimension-matrix" aria-labelledby="dimension-title">
-            <header><span>CAPABILITY MATRIX</span><h2 id="dimension-title">能力维度</h2></header>
+            <header><span>能力概览</span><h2 id="dimension-title">能力维度</h2></header>
             {report.dimensions.map((dimension) => (
               <div className="dimension-row" key={dimension.id}>
                 <div>
@@ -324,7 +348,7 @@ function CompletedReport({ report }: { report: EvaluationReport }) {
           </section>
           {trendVisible && (
             <section className="report-trend">
-              <span>COMPARABLE SESSIONS</span>
+              <span>可比较场次</span>
               <h2>跨场趋势</h2>
               <p>{report.trend_comparison.note}</p>
               <small>{report.trend_comparison.comparable_session_count} 场可比面试</small>
@@ -345,7 +369,8 @@ function CompletedReport({ report }: { report: EvaluationReport }) {
 
 function ReportSkeleton() {
   return (
-    <section className="report-skeleton" aria-label="正在加载评估报告">
+    <section className="report-skeleton" role="status" aria-label="正在加载评估报告">
+      <p>正在读取评估报告…</p>
       <div /><div /><div />
     </section>
   );

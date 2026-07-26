@@ -1,0 +1,491 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Workbench · design-system: design-tokens.css · designed-as-app */
+
+.report-index,
+.interview-report,
+.report-progress,
+.report-load-error,
+.report-skeleton,
+.coach-panel,
+.evidence-drawer-sheet {
+  color: var(--ih-color-ink);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.report-index,
+.interview-report,
+.report-progress,
+.report-load-error,
+.report-skeleton {
+  border: 1px solid var(--ih-color-border);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-surface);
+  box-shadow: var(--ih-shadow-card);
+}
+
+.report-index {
+  overflow: hidden;
+  background: var(--ih-color-page);
+}
+
+.report-index > header {
+  gap: var(--ih-space-4);
+  padding: var(--ih-space-5);
+  border-bottom: 1px solid var(--ih-color-border);
+}
+
+.report-index > header svg {
+  flex: 0 0 auto;
+  color: var(--ih-color-accent);
+}
+
+.report-index h1,
+.interview-report h1,
+.report-progress h1,
+.report-load-error h1 {
+  margin: 0;
+  color: var(--ih-color-ink);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-h1);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: var(--ih-leading);
+}
+
+.report-index > header p,
+.interview-report p,
+.report-progress p,
+.report-load-error p,
+.coach-panel p,
+.evidence-drawer-sheet p {
+  color: var(--ih-color-muted);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.report-index > header p {
+  max-width: 60ch;
+  margin: var(--ih-space-2) 0 0;
+}
+
+.report-index-loading {
+  display: grid;
+  min-height: calc(var(--ih-space-5) * 9);
+  align-content: center;
+  justify-items: center;
+  gap: var(--ih-space-3);
+  padding: var(--ih-space-5);
+  color: var(--ih-color-muted);
+  text-align: center;
+}
+
+.report-index-loading svg {
+  color: var(--ih-color-accent);
+}
+
+.report-index-loading p {
+  margin: 0;
+}
+
+.report-index-loading-lines {
+  display: grid;
+  width: min(100%, 640px);
+  gap: var(--ih-space-2);
+}
+
+.report-index-loading-lines span {
+  display: block;
+  height: var(--ih-space-2);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-border);
+}
+
+.report-register {
+  padding: 0;
+}
+
+.report-register-header,
+.report-register-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(112px, 0.75fr) minmax(0, 1.4fr) minmax(96px, 0.72fr) minmax(120px, 0.8fr) 20px;
+  align-items: center;
+  gap: var(--ih-space-3);
+}
+
+.report-register-header {
+  padding: var(--ih-space-3) var(--ih-space-5);
+  color: var(--ih-color-muted);
+  background: var(--ih-color-surface);
+  border-bottom: 1px solid var(--ih-color-border);
+}
+
+.report-register-row {
+  padding: var(--ih-space-4) var(--ih-space-5);
+  color: var(--ih-color-ink);
+  background: var(--ih-color-page);
+  border-bottom: 1px solid var(--ih-color-border);
+  text-decoration: none;
+  transition: transform var(--ih-duration-short) var(--ih-ease-out), background-color var(--ih-duration-short) var(--ih-ease-out);
+}
+
+.report-register-row:last-child {
+  border-bottom: 0;
+}
+
+.report-register-row:hover {
+  background: var(--ih-color-accent-surface);
+  transform: translateY(-1px);
+}
+
+.report-register-row:active {
+  transform: translateY(0);
+}
+
+.report-register-row:focus-visible,
+.empty-state__action a:focus-visible,
+.report-progress button:focus-visible,
+.report-progress a:focus-visible,
+.report-load-error a:focus-visible,
+.coach-panel button:focus-visible,
+.coach-panel select:focus-visible,
+.evidence-drawer button:focus-visible {
+  outline: 2px solid var(--ih-color-focus);
+  outline-offset: var(--ih-space-1);
+}
+
+.report-register-identity,
+.report-register-summary {
+  min-width: 0;
+}
+
+.report-register-identity strong,
+.report-register-summary strong {
+  display: block;
+  color: var(--ih-color-ink);
+  font-size: var(--ih-text-body);
+  font-weight: 700;
+  line-height: var(--ih-leading);
+}
+
+.report-register-identity span,
+.report-register-summary span,
+.report-register-row time {
+  display: block;
+  margin-top: var(--ih-space-1);
+  overflow: hidden;
+  color: var(--ih-color-muted);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-register-summary strong {
+  color: var(--ih-color-accent);
+}
+
+.report-status,
+.anchor-badge {
+  display: inline-flex;
+  min-height: calc(var(--ih-space-5) + var(--ih-space-1));
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--ih-space-2);
+  color: var(--ih-color-muted);
+  border: 1px solid var(--ih-color-border);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-surface);
+  font-size: var(--ih-text-body);
+  font-weight: 600;
+  line-height: var(--ih-leading);
+  white-space: nowrap;
+}
+
+.report-status.completed,
+.anchor-badge.solid,
+.anchor-badge.strong,
+.anchor-badge.partial,
+.anchor-badge.insufficient,
+.anchor-badge.evidence_insufficient {
+  color: var(--ih-color-accent);
+  border-color: var(--ih-color-accent);
+  background: var(--ih-color-accent-surface);
+}
+
+.empty-state--guided {
+  display: grid;
+  min-height: calc(var(--ih-space-5) * 9);
+  grid-template-columns: minmax(0, 1fr);
+  place-content: center;
+  justify-items: center;
+  gap: var(--ih-space-3);
+  padding: var(--ih-space-5);
+  color: var(--ih-color-ink);
+  border: 0;
+  background: var(--ih-color-page);
+  text-align: center;
+}
+
+.empty-state--guided .empty-state__icon {
+  display: grid;
+  width: calc(var(--ih-space-5) + var(--ih-space-3));
+  height: calc(var(--ih-space-5) + var(--ih-space-3));
+  place-items: center;
+  color: var(--ih-color-accent);
+  border: 1px solid var(--ih-color-accent);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-accent-surface);
+}
+
+.empty-state--guided .empty-state__copy {
+  display: grid;
+  justify-items: center;
+  gap: var(--ih-space-2);
+  max-width: 52ch;
+}
+
+.empty-state--guided h2,
+.report-index h2,
+.interview-report h2,
+.report-progress h2,
+.coach-panel h2,
+.evidence-drawer h2 {
+  margin: 0;
+  color: var(--ih-color-ink);
+  font-size: var(--ih-text-h2);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: var(--ih-leading);
+}
+
+.empty-state--guided p {
+  margin: 0;
+  color: var(--ih-color-muted);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.empty-state__action {
+  display: flex;
+  gap: var(--ih-space-2);
+}
+
+.empty-state__action a,
+.report-progress button,
+.report-progress a,
+.report-load-error a {
+  display: inline-flex;
+  min-height: var(--ih-control-height);
+  align-items: center;
+  justify-content: center;
+  gap: var(--ih-space-2);
+  padding: 0 var(--ih-space-3);
+  color: var(--ih-color-accent-foreground);
+  border: 1px solid var(--ih-color-accent);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-accent);
+  font-size: var(--ih-text-body);
+  font-weight: 700;
+  line-height: var(--ih-leading);
+  text-decoration: none;
+  transition: transform var(--ih-duration-short) var(--ih-ease-out), opacity var(--ih-duration-short) var(--ih-ease-out);
+  white-space: nowrap;
+}
+
+.empty-state__action a:hover,
+.report-progress button:hover,
+.report-progress a:hover,
+.report-load-error a:hover {
+  color: var(--ih-color-accent-foreground);
+  transform: translateY(-1px);
+}
+
+.empty-state__action a:active,
+.report-progress button:active,
+.report-progress a:active,
+.report-load-error a:active {
+  transform: translateY(0);
+}
+
+.report-progress button:disabled,
+.coach-panel button:disabled,
+.coach-panel select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.report-index-error,
+.report-load-error {
+  color: var(--ih-color-ink);
+  border-color: var(--ih-color-border);
+  background: var(--ih-color-page);
+}
+
+.report-index-error {
+  margin: 0;
+  padding: var(--ih-space-4) var(--ih-space-5);
+  border-bottom: 1px solid var(--ih-color-border);
+}
+
+.report-load-error,
+.report-progress {
+  min-height: calc(var(--ih-space-5) * 14);
+  place-content: center;
+  gap: var(--ih-space-3);
+  padding: var(--ih-space-5);
+  text-align: center;
+}
+
+.report-load-error svg,
+.report-progress > svg {
+  color: var(--ih-color-accent);
+}
+
+.report-progress > span,
+.report-hero > div > span,
+.report-outline > span,
+.question-review > header span,
+.practice-plan header span,
+.dimension-matrix header span,
+.report-trend > span,
+.coach-panel header span,
+.evidence-drawer header span {
+  color: var(--ih-color-muted);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.report-progress-track {
+  height: var(--ih-space-2);
+  margin-top: var(--ih-space-3);
+  overflow: hidden;
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-border);
+}
+
+.report-progress-track span {
+  background: var(--ih-color-accent);
+}
+
+.report-skeleton {
+  gap: var(--ih-space-3);
+  padding: var(--ih-space-5);
+  background: var(--ih-color-page);
+}
+
+.report-skeleton > div {
+  min-height: calc(var(--ih-space-5) * 3);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-border);
+}
+
+.interview-report {
+  padding: var(--ih-space-5);
+  background: var(--ih-color-page);
+}
+
+.interview-report h3,
+.coach-panel h3,
+.evidence-drawer h3,
+.interview-report :is(p, li, small, dt, dd, a, button, select, span),
+.coach-panel :is(p, li, strong, label, button, select),
+.evidence-drawer :is(p, blockquote, dt, dd, strong, span, button) {
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  letter-spacing: 0;
+  line-height: var(--ih-leading);
+}
+
+.report-hero,
+.report-overview,
+.question-review,
+.practice-plan,
+.dimension-matrix,
+.report-trend,
+.coach-panel,
+.evidence-drawer-sheet {
+  border-color: var(--ih-color-border);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-surface);
+  box-shadow: var(--ih-shadow-card);
+}
+
+.coach-panel button,
+.coach-panel select,
+.evidence-drawer button {
+  border-radius: var(--ih-radius);
+}
+
+.coach-panel button.active,
+.coach-panel .coach-run {
+  color: var(--ih-color-accent-foreground);
+  border-color: var(--ih-color-accent);
+  background: var(--ih-color-accent);
+}
+
+.evidence-drawer::backdrop {
+  background: var(--ih-color-backdrop);
+}
+
+@media (max-width: 980px) {
+  .report-register-header,
+  .report-register-row {
+    grid-template-columns: minmax(0, 1fr) minmax(112px, 0.85fr) minmax(0, 1fr) minmax(96px, 0.75fr) 20px;
+  }
+
+  .report-register-header > :nth-child(5),
+  .report-register-row > :nth-child(5) {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .report-index > header,
+  .interview-report,
+  .report-progress,
+  .report-load-error,
+  .report-skeleton {
+    padding: var(--ih-space-4);
+  }
+
+  .report-index > header {
+    display: grid;
+  }
+
+  .report-register-header {
+    display: none;
+  }
+
+  .report-register-row {
+    grid-template-columns: minmax(0, 1fr) 20px;
+    gap: var(--ih-space-2);
+    padding: var(--ih-space-4);
+  }
+
+  .report-register-row > :not(:last-child) {
+    grid-column: 1;
+  }
+
+  .report-register-row > :last-child {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .empty-state--guided {
+    min-height: calc(var(--ih-space-5) * 8);
+    padding: var(--ih-space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .report-register-row,
+  .empty-state__action a,
+  .report-progress button,
+  .report-progress a,
+  .report-load-error a {
+    transition-duration: 50ms;
+  }
+}

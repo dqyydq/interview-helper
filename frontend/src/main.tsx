@@ -5,6 +5,8 @@ import { RouterProvider } from "react-router-dom";
 
 import { appRouter } from "./app/router";
 import "./styles.css";
+import "./design-tokens.css";
+import "./report-visual-refactor.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

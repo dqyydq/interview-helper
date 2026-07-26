@@ -33,7 +33,7 @@ export function CoachPanel({ reportId, questions }: CoachPanelProps) {
       <header>
         <Sparkles size={17} aria-hidden="true" />
         <div>
-          <span>REVIEW COACH</span>
+          <span>答题复盘与练习</span>
           <h2 id="coach-title">复盘教练</h2>
         </div>
       </header>

@@ -34,7 +34,7 @@ export function EvidenceDrawer({ evidence, message, onClose }: EvidenceDrawerPro
       <div className="evidence-drawer-sheet">
         <header>
           <div>
-            <span>TRACEABLE EVIDENCE</span>
+            <span>可回溯的回答引用</span>
             <h2 id="evidence-drawer-title">原回答证据</h2>
           </div>
           <button type="button" aria-label="关闭证据" onClick={onClose}>
@@ -45,7 +45,7 @@ export function EvidenceDrawer({ evidence, message, onClose }: EvidenceDrawerPro
           <article id={`evidence-message-${message.id}`} tabIndex={-1}>
             <div className="evidence-sequence">
               <Quote size={15} aria-hidden="true" />
-              MESSAGE {String(message.sequence).padStart(2, "0")}
+              第 {String(message.sequence).padStart(2, "0")} 条消息
             </div>
             <blockquote>{message.content}</blockquote>
             {message.attachments?.map((attachment) => (

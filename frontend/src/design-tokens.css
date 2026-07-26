@@ -1,0 +1,36 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Workbench · tone: precise · anchor hue: indigo
+ * UI refactor design tokens — first applied to the report workspace.
+ * The existing token file remains untouched until the global consolidation step. */
+:root {
+  --ih-color-page: #FAFAFA;
+  --ih-color-surface: #FFFFFF;
+  --ih-color-ink: #202025;
+  --ih-color-muted: #666671;
+  --ih-color-border: #E5E5EA;
+  --ih-color-nav: #0A0A0A;
+  --ih-color-nav-muted: #B7B7C0;
+  --ih-color-accent: #5B5FEF;
+  --ih-color-accent-surface: #F0F0FF;
+  --ih-color-accent-foreground: #FFFFFF;
+  --ih-color-focus: var(--ih-color-accent);
+  --ih-color-backdrop: rgba(10, 10, 10, 0.32);
+  --ih-shadow-card: 0 12px 32px rgba(26, 26, 34, 0.06);
+
+  --ih-font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+
+  --ih-text-h1: 24px;
+  --ih-text-h2: 16px;
+  --ih-text-body: 14px;
+  --ih-leading: 1.5;
+
+  --ih-space-1: 4px;
+  --ih-space-2: 8px;
+  --ih-space-3: 16px;
+  --ih-space-4: 24px;
+  --ih-space-5: 32px;
+
+  --ih-radius: 8px;
+  --ih-control-height: 40px;
+  --ih-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ih-duration-short: 160ms;
+}
