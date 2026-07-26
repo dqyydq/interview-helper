@@ -1,0 +1,291 @@
+.visual-evidence-dialog {
+  width: min(680px, 100%);
+  max-height: min(800px, calc(100dvh - 48px));
+  overflow: auto;
+}
+
+.style-evidence-research {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.style-evidence-research .compact-action {
+  justify-self: start;
+}
+
+.style-evidence-research-note {
+  color: var(--color-report-muted) !important;
+}
+
+.visual-evidence-dialog .dialog-heading {
+  align-items: flex-start;
+}
+
+.visual-evidence-privacy-note,
+.visual-evidence-warning,
+.visual-evidence-save-actions,
+.visual-evidence-file-picker,
+.visual-evidence-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.visual-evidence-privacy-note {
+  padding: var(--space-4);
+  color: var(--color-report-ink-2);
+  border: 1px solid var(--color-report-rule);
+  background: var(--color-report-paper-2);
+}
+
+.visual-evidence-privacy-note svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--color-accent);
+}
+
+.visual-evidence-privacy-note p,
+.visual-evidence-warning,
+.visual-evidence-confirmation span,
+.visual-evidence-save-actions span {
+  margin: 0;
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+
+.visual-evidence-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.visual-evidence-form > label:not(.visual-evidence-file-picker):not(.visual-evidence-confirmation),
+.visual-evidence-candidate > label:not(.visual-evidence-candidate-toggle):not(.visual-evidence-confidence) {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-report-ink-2);
+  font-size: var(--text-label);
+  font-weight: 650;
+}
+
+.visual-evidence-form input:not([type="checkbox"]):not([type="file"]),
+.visual-evidence-candidate select,
+.visual-evidence-candidate textarea {
+  width: 100%;
+  min-height: var(--control-height-md);
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  color: var(--color-report-ink);
+  border: 1px solid var(--color-report-rule-strong);
+  border-radius: var(--radius-report);
+  background: var(--color-report-paper);
+  font: inherit;
+}
+
+.visual-evidence-candidate textarea {
+  min-height: 84px;
+  padding-block: var(--space-3);
+  line-height: var(--leading-body);
+  resize: vertical;
+}
+
+.visual-evidence-file-picker {
+  min-height: var(--control-height-lg);
+  align-items: center;
+  padding: 0 var(--space-4);
+  color: var(--color-accent);
+  border: 1px dashed var(--color-accent);
+  border-radius: var(--radius-report);
+  background: var(--color-report-paper-2);
+  cursor: pointer;
+  font-size: var(--text-control);
+  font-weight: 650;
+}
+
+.visual-evidence-file-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.visual-evidence-confirmation {
+  color: var(--color-report-ink-2);
+  cursor: pointer;
+}
+
+.visual-evidence-confirmation input,
+.visual-evidence-candidate-toggle input {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  margin-top: 2px;
+  accent-color: var(--color-accent);
+}
+
+.visual-evidence-form-actions,
+.visual-evidence-save-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.visual-evidence-form-actions {
+  padding-top: var(--space-2);
+}
+
+.visual-evidence-form-actions .primary-button,
+.visual-evidence-save-actions .primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.visual-evidence-error {
+  margin-inline: 0;
+}
+
+.visual-evidence-result {
+  display: grid;
+  gap: var(--space-4);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-report-rule);
+}
+
+.visual-evidence-result > header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.visual-evidence-result header span:first-child {
+  display: block;
+  color: var(--color-report-muted);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+}
+
+.visual-evidence-result h3 {
+  margin: var(--space-1) 0 0;
+  color: var(--color-report-ink);
+  font-size: var(--text-heading);
+  line-height: var(--leading-heading);
+}
+
+.visual-evidence-result-count {
+  flex: 0 0 auto;
+  color: var(--color-report-muted);
+  font-size: var(--text-meta);
+}
+
+.visual-evidence-warning {
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-report-warning);
+  border-left: 2px solid var(--color-report-warning);
+  background: var(--color-report-warning-paper);
+}
+
+.visual-evidence-warning svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.visual-evidence-candidates {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.visual-evidence-candidate {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-report-rule);
+  background: var(--color-report-paper-2);
+}
+
+.visual-evidence-candidate-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-report-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+
+.visual-evidence-confidence {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-report-ink-2);
+  font-size: var(--text-label);
+}
+
+.visual-evidence-confidence strong {
+  color: var(--color-report-ink);
+  font-size: var(--text-label);
+}
+
+.visual-evidence-confidence input {
+  width: 100%;
+  accent-color: var(--color-accent);
+}
+
+.visual-evidence-save-actions {
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-report-rule);
+}
+
+.visual-evidence-save-actions span {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: 360px;
+  color: var(--color-report-muted);
+}
+
+.visual-evidence-save-actions span svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--color-report-positive);
+}
+
+.visual-evidence-empty {
+  min-height: 180px;
+  padding: var(--space-5);
+}
+
+.visual-evidence-spinner {
+  animation: visual-evidence-spin 900ms linear infinite;
+}
+
+@keyframes visual-evidence-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .visual-evidence-dialog {
+    padding: var(--space-5);
+  }
+
+  .visual-evidence-result > header,
+  .visual-evidence-save-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .visual-evidence-form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .visual-evidence-form-actions button,
+  .visual-evidence-save-actions button {
+    width: 100%;
+  }
+}

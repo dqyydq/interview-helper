@@ -65,6 +65,21 @@ class EvidenceItemPublic(EntityPublic):
     confidence: float
 
 
+class VisualEvidenceCandidatePublic(ApiModel):
+    field_path: str
+    excerpt: str
+    confidence: float
+
+
+class VisualEvidenceExtractionPublic(ApiModel):
+    source_url: AnyHttpUrl
+    source_title: str
+    candidates: list[VisualEvidenceCandidatePublic]
+    allowed_field_paths: list[str]
+    warning_codes: list[str]
+    image_retained: bool = False
+
+
 class StylePackDraft(ApiModel):
     name: str = Field(default="自定义风格草案", min_length=1, max_length=160)
     supported_roles: list[str] = Field(default_factory=list)

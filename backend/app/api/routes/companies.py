@@ -1,8 +1,11 @@
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, File, Form, Query, Response, UploadFile, status
+from pydantic import AnyHttpUrl
 
 from app.api.deps import SessionDep
+from app.api.errors import AppError
 from app.schemas.company import (
     CompanyCreate,
     CompanyPublic,
@@ -15,8 +18,11 @@ from app.schemas.company import (
     RoundProfileUpdate,
     StylePackRevisionCreate,
     StylePackUpdate,
+    VisualEvidenceCandidatePublic,
+    VisualEvidenceExtractionPublic,
 )
 from app.services import companies as service
+from app.services import visual_evidence
 from app.services.model_connections import ensure_local_profile
 
 router = APIRouter(tags=["companies"])
@@ -161,3 +167,69 @@ async def add_evidence(
     style_pack = await service.get_style_pack(session, style_pack_id, profile.id)
     item = await service.add_evidence(session, style_pack, payload)
     return EvidenceItemPublic.model_validate(item)
+
+
+@router.post(
+    "/style-packs/{style_pack_id}/evidence/visual-extract",
+    response_model=VisualEvidenceExtractionPublic,
+)
+async def extract_visual_evidence_drafts(
+    style_pack_id: uuid.UUID,
+    session: SessionDep,
+    image: Annotated[UploadFile, File(description="PNG、JPEG 或 WebP 截图")],
+    source_url: Annotated[AnyHttpUrl, Form()],
+    source_title: Annotated[str, Form(min_length=1, max_length=500)],
+    source_confirmed: Annotated[bool, Form()],
+) -> VisualEvidenceExtractionPublic:
+    """Turn one transient screenshot into review-only evidence candidates.
+
+    The original file is read with a hard size cap and discarded after the visual model response;
+    this endpoint never creates an evidence record by itself.
+    """
+
+    if not source_confirmed:
+        raise AppError(
+            code="visual_evidence_source_unconfirmed",
+            message="请先确认资料已脱敏且你有权将其发送给当前视觉模型",
+            status_code=422,
+        )
+    normalized_title = source_title.strip()
+    if not normalized_title:
+        raise AppError(
+            code="visual_evidence_source_title_empty",
+            message="请填写来源标题，方便后续审核证据",
+            status_code=422,
+        )
+    raw_image = await image.read(visual_evidence.settings.visual_evidence_upload_max_bytes + 1)
+    await image.close()
+    validated_image = visual_evidence.validate_visual_image_upload(
+        content=raw_image,
+        content_type=image.content_type,
+    )
+    profile = await ensure_local_profile(session)
+    style_pack = await service.get_style_pack(session, style_pack_id, profile.id)
+    company = await service.get_company(session, profile.id, style_pack.company_id)
+    rounds = await service.list_style_pack_rounds(session, style_pack.id)
+    result = await visual_evidence.analyse_visual_evidence(
+        session,
+        profile_id=profile.id,
+        style_pack=style_pack,
+        company_name=company.name,
+        rounds=rounds,
+        image=validated_image,
+    )
+    return VisualEvidenceExtractionPublic(
+        source_url=source_url,
+        source_title=normalized_title,
+        candidates=[
+            VisualEvidenceCandidatePublic(
+                field_path=item.field_path,
+                excerpt=item.excerpt,
+                confidence=item.confidence,
+            )
+            for item in result.candidates
+        ],
+        allowed_field_paths=list(result.allowed_field_paths),
+        warning_codes=list(result.warning_codes),
+        image_retained=False,
+    )

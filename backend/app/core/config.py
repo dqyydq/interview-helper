@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     upload_dir: Path = REPOSITORY_ROOT / "data" / "uploads"
     resume_upload_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1_024)
     audio_upload_max_bytes: int = Field(default=15 * 1024 * 1024, ge=1_024)
+    visual_evidence_upload_max_bytes: int = Field(default=3 * 1024 * 1024, ge=1_024)
+    visual_evidence_request_timeout_seconds: float = Field(default=45.0, ge=5.0, le=90.0)
+    visual_evidence_input_tokens: int = Field(default=6_000, ge=1_024, le=12_000)
+    visual_evidence_output_tokens: int = Field(default=1_024, ge=128, le=2_048)
     resume_parse_timeout_seconds: float = Field(default=20.0, ge=1.0, le=300.0)
     websocket_connections_per_minute: int = Field(default=12, ge=1, le=1_000)
     websocket_rate_limiter_max_keys: int = Field(default=4_096, ge=1, le=100_000)

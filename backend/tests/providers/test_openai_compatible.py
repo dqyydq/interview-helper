@@ -77,6 +77,39 @@ async def test_openai_chat_converts_internal_contract() -> None:
 
 
 @pytest.mark.asyncio
+async def test_openai_chat_can_use_json_mode_for_model_studio_structured_output() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert payload["response_format"] == {"type": "json_object"}
+        assert "JSON" in payload["messages"][0]["content"]
+        return httpx.Response(
+            200,
+            json={
+                "id": "response-json-mode",
+                "choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 2, "completion_tokens": 1},
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OpenAICompatibleProvider(
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            api_key="test-key",
+            model="qwen-vision-test",
+            structured_output_mode="json_object",
+            client=client,
+        )
+        response = await provider.chat(
+            ChatRequest(
+                messages=[ChatMessage(role=MessageRole.USER, content="Return JSON only")],
+                response_schema={"type": "object"},
+            )
+        )
+
+    assert response.content == "{}"
+
+
+@pytest.mark.asyncio
 async def test_openai_chat_converts_url_and_base64_images_to_content_blocks() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)

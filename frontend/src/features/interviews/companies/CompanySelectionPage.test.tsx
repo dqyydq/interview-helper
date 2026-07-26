@@ -16,6 +16,8 @@ vi.mock("./api", () => ({
     createRound: vi.fn(),
     updateRound: vi.fn(),
     deleteRound: vi.fn(),
+    extractVisualEvidence: vi.fn(),
+    addEvidence: vi.fn(),
   },
 }));
 
@@ -133,6 +135,33 @@ describe("CompanySelectionPage", () => {
     });
     vi.mocked(companyApi.updateRound).mockResolvedValue(customCompany.latest_style_pack!.rounds[0]);
     vi.mocked(companyApi.deleteRound).mockResolvedValue(undefined);
+    vi.mocked(companyApi.extractVisualEvidence).mockResolvedValue({
+      source_url: "https://example.com/interview-notes",
+      source_title: "匿名面试复盘页面",
+      candidates: [
+        {
+          field_path: "rounds.round_1.follow_up_patterns",
+          excerpt: "围绕项目取舍和验证方式继续追问。",
+          confidence: 0.74,
+        },
+      ],
+      allowed_field_paths: [
+        "default_interviewer_behavior",
+        "rounds.round_1.follow_up_patterns",
+      ],
+      warning_codes: ["image_not_retained"],
+      image_retained: false,
+    });
+    vi.mocked(companyApi.addEvidence).mockResolvedValue({
+      id: "evidence-1",
+      source_url: "https://example.com/interview-notes",
+      source_title: "匿名面试复盘页面",
+      field_path: "rounds.round_1.follow_up_patterns",
+      excerpt: "围绕项目取舍和验证方式继续追问。",
+      published_at: null,
+      fetched_at: "2026-07-26T00:00:00Z",
+      confidence: 0.74,
+    });
   });
 
   it("keeps system skeletons visibly evidence-limited and read-only", async () => {
@@ -227,5 +256,51 @@ describe("CompanySelectionPage", () => {
     const archiveDialog = screen.getByRole("dialog", { name: "归档 我的 AI 公司" });
     fireEvent.click(within(archiveDialog).getByRole("button", { name: "确认归档" }));
     await waitFor(() => expect(companyApi.archive).toHaveBeenCalledWith("company-custom"));
+  });
+
+  it("turns a private screenshot into review-only evidence before the user explicitly writes it", async () => {
+    renderPage([customCompany]);
+
+    await screen.findByRole("button", { name: "用截图整理" });
+    fireEvent.click(screen.getByRole("button", { name: "用截图整理" }));
+    const dialog = screen.getByRole("dialog", { name: /用截图整理.*面试信号/ });
+    fireEvent.change(within(dialog).getByLabelText("原始页面链接"), {
+      target: { value: "https://example.com/interview-notes" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("来源标题"), {
+      target: { value: "匿名面试复盘页面" },
+    });
+    const image = new File(["safe image"], "notes.png", { type: "image/png" });
+    fireEvent.change(within(dialog).getByLabelText(/选择已脱敏截图/), {
+      target: { files: [image] },
+    });
+    fireEvent.click(within(dialog).getByLabelText(/我确认资料已去除个人信息/));
+    const extractButton = within(dialog).getByRole("button", { name: "解析为证据草案" });
+    await waitFor(() => expect(extractButton).toBeEnabled());
+    fireEvent.click(extractButton);
+
+    await waitFor(() => expect(companyApi.extractVisualEvidence).toHaveBeenCalledWith(
+      "pack-custom",
+      expect.objectContaining({
+        sourceUrl: "https://example.com/interview-notes",
+        sourceTitle: "匿名面试复盘页面",
+        sourceConfirmed: true,
+        image,
+      }),
+    ));
+    expect(await within(dialog).findByDisplayValue("围绕项目取舍和验证方式继续追问。")).toBeInTheDocument();
+    expect(companyApi.addEvidence).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "确认写入草案" }));
+    await waitFor(() => expect(companyApi.addEvidence).toHaveBeenCalledWith(
+      "pack-custom",
+      {
+        source_url: "https://example.com/interview-notes",
+        source_title: "匿名面试复盘页面",
+        field_path: "rounds.round_1.follow_up_patterns",
+        excerpt: "围绕项目取舍和验证方式继续追问。",
+        confidence: 0.74,
+      },
+    ));
   });
 });

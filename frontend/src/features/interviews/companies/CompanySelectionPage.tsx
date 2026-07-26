@@ -20,6 +20,7 @@ import { type FormEvent, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { companyApi } from "./api";
+import { CompanyEvidenceResearchDialog } from "./CompanyEvidenceResearchDialog";
 import type { CompanyDraft, RoundDraft, RoundProfile } from "./types";
 
 const defaultCompanyDraft = (): CompanyDraft => ({
@@ -94,6 +95,7 @@ export function CompanySelectionPage() {
   const [roundDraft, setRoundDraft] = useState<RoundDraft>(() => nextRoundDraft([]));
   const [roundPendingDeletion, setRoundPendingDeletion] = useState<RoundProfile>();
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [evidenceResearchOpen, setEvidenceResearchOpen] = useState(false);
   const [actionError, setActionError] = useState<string>();
 
   const companies = useQuery({ queryKey: ["companies"], queryFn: companyApi.list });
@@ -256,6 +258,19 @@ export function CompanySelectionPage() {
     setRoundDraft(editableRound(round));
     setRoundFormMode("edit");
     setActionError(undefined);
+  };
+  const openEvidenceResearch = () => {
+    if (!company || !stylePack) return;
+    if (!isCustomDraft) {
+      setActionError(
+        company.is_system
+          ? "请先创建我的版本，再为自己的草案补充来源证据。"
+          : "已启用的风格包不可直接修改，请先创建一个新的草案版本。",
+      );
+      return;
+    }
+    setActionError(undefined);
+    setEvidenceResearchOpen(true);
   };
 
   const submitCompany = (event: FormEvent<HTMLFormElement>) => {
@@ -526,11 +541,38 @@ export function CompanySelectionPage() {
           <h3>信息来源</h3>
           <p>{stylePack?.evidence_label || "尚未选择风格包"}</p>
         </section>
+        <section className="style-evidence-research">
+          <div>
+            <h3>补充来源证据</h3>
+            <p>用已脱敏的页面截图提炼匿名化结论；模型只生成草案，确认后才会写入当前版本。</p>
+          </div>
+          {isCustomDraft ? (
+            <button className="compact-action" type="button" onClick={openEvidenceResearch}>
+              <FileSearch size={15} aria-hidden="true" /> 用截图整理
+            </button>
+          ) : (
+            <p className="style-evidence-research-note">
+              {company?.is_system ? "创建我的版本后即可补充资料。" : "请在新草案版本中补充资料。"}
+            </p>
+          )}
+        </section>
         <div className="preview-caution">
           <AlertTriangle size={17} aria-hidden="true" />
           <p>公司风格仅作为模拟参数。无来源内容会明确标为草案，不代表官方标准。</p>
         </div>
       </aside>
+
+      {evidenceResearchOpen && company && stylePack && (
+        <CompanyEvidenceResearchDialog
+          companyName={company.name}
+          stylePack={stylePack}
+          onClose={() => setEvidenceResearchOpen(false)}
+          onCompleted={async () => {
+            setActionError(undefined);
+            await refreshCompanies();
+          }}
+        />
+      )}
 
       <footer className="selection-command">
         <div>

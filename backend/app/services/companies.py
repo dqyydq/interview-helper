@@ -111,6 +111,15 @@ async def _rounds(session: AsyncSession, style_pack_id: uuid.UUID) -> Sequence[R
     return result.all()
 
 
+async def list_style_pack_rounds(
+    session: AsyncSession,
+    style_pack_id: uuid.UUID,
+) -> list[RoundProfile]:
+    """Return the current round rows for an already-authorised style pack."""
+
+    return list(await _rounds(session, style_pack_id))
+
+
 async def _evidence(session: AsyncSession, style_pack_id: uuid.UUID) -> Sequence[EvidenceItem]:
     result = await session.scalars(
         select(EvidenceItem)
@@ -286,6 +295,12 @@ def _assert_draft(style_pack: CompanyStylePack) -> None:
             message="已启用的风格包不可直接修改，请创建新版本",
             status_code=409,
         )
+
+
+def assert_style_pack_draft(style_pack: CompanyStylePack) -> None:
+    """Expose the same immutable-pack guard to adjacent company workflows."""
+
+    _assert_draft(style_pack)
 
 
 async def update_style_pack(

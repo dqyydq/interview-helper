@@ -1,7 +1,7 @@
 import json
 import time
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -35,6 +35,7 @@ class OpenAICompatibleProvider(ChatProvider):
         model: str,
         timeout_seconds: float = 60.0,
         extra_headers: dict[str, str] | None = None,
+        structured_output_mode: Literal["json_schema", "json_object"] = "json_schema",
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -42,6 +43,7 @@ class OpenAICompatibleProvider(ChatProvider):
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.extra_headers = extra_headers or {}
+        self.structured_output_mode = structured_output_mode
         self.client = client or httpx.AsyncClient(
             trust_env=trust_environment_for_provider_url(base_url)
         )
@@ -117,10 +119,16 @@ class OpenAICompatibleProvider(ChatProvider):
                 for tool in request.tools
             ]
         if request.response_schema:
-            payload["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {"name": "structured_output", "schema": request.response_schema},
-            }
+            if self.structured_output_mode == "json_object":
+                # Alibaba Cloud Model Studio's OpenAI-compatible endpoint uses JSON Mode rather
+                # than OpenAI's ``json_schema`` response format. The structured runner still
+                # validates the resulting JSON against the same local Pydantic schema.
+                payload["response_format"] = {"type": "json_object"}
+            else:
+                payload["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {"name": "structured_output", "schema": request.response_schema},
+                }
         if stream:
             payload["stream_options"] = {"include_usage": True}
         return payload

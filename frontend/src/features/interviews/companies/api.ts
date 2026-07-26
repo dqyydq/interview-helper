@@ -3,9 +3,13 @@ import type {
   Company,
   CompanyDraft,
   CompanyUpdateDraft,
+  EvidenceDraft,
+  EvidenceItem,
   RoundDraft,
   RoundProfile,
   RoundUpdateDraft,
+  VisualEvidenceExtractDraft,
+  VisualEvidenceExtraction,
 } from "./types";
 
 export const companyApi = {
@@ -34,4 +38,20 @@ export const companyApi = {
     }),
   deleteRound: (roundId: string) =>
     apiRequest<void>(`/rounds/${roundId}`, { method: "DELETE" }),
+  extractVisualEvidence: (stylePackId: string, draft: VisualEvidenceExtractDraft) => {
+    const body = new FormData();
+    body.set("image", draft.image);
+    body.set("source_url", draft.sourceUrl);
+    body.set("source_title", draft.sourceTitle);
+    body.set("source_confirmed", String(draft.sourceConfirmed));
+    return apiRequest<VisualEvidenceExtraction>(
+      `/style-packs/${stylePackId}/evidence/visual-extract`,
+      { method: "POST", body },
+    );
+  },
+  addEvidence: (stylePackId: string, draft: EvidenceDraft) =>
+    apiRequest<EvidenceItem>(`/style-packs/${stylePackId}/evidence`, {
+      method: "POST",
+      body: JSON.stringify(draft),
+    }),
 };

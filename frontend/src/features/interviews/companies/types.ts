@@ -26,6 +26,47 @@ export interface CompanyStylePack {
   rounds: RoundProfile[];
 }
 
+export interface EvidenceItem {
+  id: string;
+  source_url: string;
+  source_title: string;
+  field_path: string;
+  excerpt: string;
+  published_at: string | null;
+  fetched_at: string;
+  confidence: number;
+}
+
+export interface EvidenceDraft {
+  source_url: string;
+  source_title: string;
+  field_path: string;
+  excerpt: string;
+  confidence: number;
+}
+
+export interface VisualEvidenceCandidate {
+  field_path: string;
+  excerpt: string;
+  confidence: number;
+}
+
+export interface VisualEvidenceExtraction {
+  source_url: string;
+  source_title: string;
+  candidates: VisualEvidenceCandidate[];
+  allowed_field_paths: string[];
+  warning_codes: string[];
+  image_retained: false;
+}
+
+export interface VisualEvidenceExtractDraft {
+  sourceUrl: string;
+  sourceTitle: string;
+  sourceConfirmed: boolean;
+  image: File;
+}
+
 export interface Company {
   id: string;
   name: string;

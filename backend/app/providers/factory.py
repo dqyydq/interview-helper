@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from app.core.config import settings
 from app.core.crypto import SecretCipher
 from app.db.models.common import ProviderType
@@ -9,6 +11,20 @@ from app.providers.openai_compatible import OpenAICompatibleProvider
 from app.providers.openai_embedding import OpenAICompatibleEmbeddingProvider
 from app.providers.openai_transcription import OpenAICompatibleTranscriptionProvider
 from app.providers.speech_base import SpeechToTextProvider
+
+
+def _openai_structured_output_mode(base_url: str) -> str:
+    """Use Model Studio's documented JSON Mode for its OpenAI-compatible domains.
+
+    Other OpenAI-compatible providers retain JSON Schema by default.  This narrow URL-based
+    switch avoids weakening structured output for normal OpenAI and self-hosted endpoints while
+    letting a DashScope-bound visual role use the protocol it actually supports.
+    """
+
+    hostname = (urlsplit(base_url).hostname or "").casefold()
+    if hostname.endswith("aliyuncs.com"):
+        return "json_object"
+    return "json_schema"
 
 
 def build_provider(connection: ModelConnection) -> ChatProvider:
@@ -27,7 +43,10 @@ def build_provider(connection: ModelConnection) -> ChatProvider:
         "extra_headers": headers,
     }
     if connection.provider_type == ProviderType.OPENAI_COMPATIBLE:
-        return OpenAICompatibleProvider(**common)
+        return OpenAICompatibleProvider(
+            **common,
+            structured_output_mode=_openai_structured_output_mode(connection.base_url),
+        )
     if connection.provider_type == ProviderType.ANTHROPIC_COMPATIBLE:
         return AnthropicCompatibleProvider(**common)
     raise ProviderError(code="provider_type_unsupported", message="不支持该模型协议")
