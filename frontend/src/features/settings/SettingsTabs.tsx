@@ -3,10 +3,10 @@ import { NavLink } from "react-router-dom";
 
 export function SettingsTabs() {
   return (
-    <nav className="settings-tabs" aria-label="系统设置分类">
+    <nav className="settings-tabs" aria-label="设置分类">
       <NavLink end to="/settings">
         <Cpu size={15} aria-hidden="true" />
-        模型与 Agent
+        模型与智能体
       </NavLink>
       <NavLink to="/settings/memory">
         <BrainCircuit size={15} aria-hidden="true" />

@@ -66,8 +66,8 @@ describe("DiscoverySettingsPage", () => {
 
     renderPage();
 
-    expect(await screen.findByText("TAVILY · 已保存 3/3")).toBeInTheDocument();
-    expect(screen.getByText("FIRECRAWL · 已保存 1/3")).toBeInTheDocument();
+    expect(await screen.findByText("已保存 3/3")).toBeInTheDocument();
+    expect(screen.getByText("已保存 1/3")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "新建 Tavily 连接器" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "新建 Firecrawl 连接器" })).toBeEnabled();
   });
@@ -77,7 +77,7 @@ describe("DiscoverySettingsPage", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "新建 Firecrawl 连接器" }));
     fireEvent.change(screen.getByLabelText("连接器名称"), { target: { value: "我的 Firecrawl" } });
-    fireEvent.change(screen.getByLabelText("Firecrawl API Key"), { target: { value: "fc-local-key" } });
+    fireEvent.change(screen.getByLabelText("Firecrawl API 密钥"), { target: { value: "fc-local-key" } });
     fireEvent.click(screen.getByRole("button", { name: "保存连接器" }));
 
     await waitFor(() => expect(discoveryApi.createConnector).toHaveBeenCalledWith(

@@ -21,6 +21,7 @@ import type {
   DiscoveryProviderType,
 } from "../../discovery/types";
 import { SettingsTabs } from "../SettingsTabs";
+import { SettingsSectionHeading } from "../SettingsSectionHeading";
 
 type ConnectorFormMode = "create" | "edit" | null;
 
@@ -49,7 +50,7 @@ const providerLabels: Record<DiscoveryProviderType, string> = {
 };
 
 function providerKeyLabel(providerType: DiscoveryProviderType) {
-  return `${providerLabels[providerType]} API Key`;
+  return `${providerLabels[providerType]} API 密钥`;
 }
 
 const statusLabels: Record<DiscoveryConnector["status"], string> = {
@@ -229,7 +230,7 @@ export function DiscoverySettingsPage() {
     <section className="settings-console" aria-labelledby="discovery-settings-title">
       <header className="settings-intro">
         <div>
-          <p className="eyebrow">SOURCE-AWARE QUESTION DISCOVERY</p>
+          <p className="eyebrow">题目发现与来源</p>
           <h1 id="discovery-settings-title">题目发现连接器</h1>
           <p>
             配置题目发现服务来检索公开面试资料。每种服务最多保存 3 个自有连接器；凭据只会由本地后端加密保存。
@@ -247,7 +248,7 @@ export function DiscoverySettingsPage() {
                 ? "题目发现已就绪"
                 : "需要一个已测试的连接器"}
             </strong>
-            <small>DISCOVERY / LOCAL CREDENTIAL STORE</small>
+            <small>发现服务与本地凭据</small>
           </span>
         </div>
       </header>
@@ -259,14 +260,13 @@ export function DiscoverySettingsPage() {
 
       <div className="settings-grid">
         <section className="connection-panel" aria-labelledby="discovery-connectors-title">
-          <div className="panel-heading">
-            <div>
-              <span>
-                01 / DISCOVERY CONNECTORS · TAVILY {providerCount("tavily")}/{connectorsPerProviderLimit} · FIRECRAWL {providerCount("firecrawl")}/{connectorsPerProviderLimit}
-              </span>
-              <h2 id="discovery-connectors-title">发现连接器</h2>
-            </div>
-          </div>
+          <SettingsSectionHeading
+            icon={SearchCheck}
+            label={`已保存 Tavily ${providerCount("tavily")}/${connectorsPerProviderLimit} · Firecrawl ${providerCount("firecrawl")}/${connectorsPerProviderLimit}`}
+            title="发现连接器"
+            titleId="discovery-connectors-title"
+            description="为公开面试资料检索配置独立连接器；每种服务最多保存三个账号。"
+          />
 
           {formMode && (
             <form className="connection-form" onSubmit={submit}>
@@ -351,22 +351,25 @@ export function DiscoverySettingsPage() {
 
             return (
               <section className="connection-provider-group" key={providerType} aria-labelledby={providerId}>
-                <div className="panel-heading">
-                  <div>
-                    <span>{providerLabels[providerType].toUpperCase()} · 已保存 {providerConnectors.length}/{connectorsPerProviderLimit}</span>
-                    <h2 id={providerId}>{providerLabels[providerType]} 连接器</h2>
-                  </div>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    aria-label={`新建 ${providerLabels[providerType]} 连接器`}
-                    disabled={atLimit}
-                    title={atLimit ? `已达到 ${connectorsPerProviderLimit} 个连接器上限` : `新建 ${providerLabels[providerType]} 连接器`}
-                    onClick={() => openCreate(providerType)}
-                  >
-                    <Plus size={16} aria-hidden="true" /> 新建
-                  </button>
-                </div>
+                <SettingsSectionHeading
+                  icon={providerType === "tavily" ? SearchCheck : Flame}
+                  label={`已保存 ${providerConnectors.length}/${connectorsPerProviderLimit}`}
+                  title={`${providerLabels[providerType]} 连接器`}
+                  titleId={providerId}
+                  description={providerType === "tavily" ? "用于检索公开面试资料与来源。" : "用于提取链接中的可用题目内容。"}
+                  action={(
+                    <button
+                      className="primary-button"
+                      type="button"
+                      aria-label={`新建 ${providerLabels[providerType]} 连接器`}
+                      disabled={atLimit}
+                      title={atLimit ? `已达到 ${connectorsPerProviderLimit} 个连接器上限` : `新建 ${providerLabels[providerType]} 连接器`}
+                      onClick={() => openCreate(providerType)}
+                    >
+                      <Plus size={16} aria-hidden="true" /> 新建
+                    </button>
+                  )}
+                />
                 <div className="connection-list" aria-live="polite">
                   {providerConnectors.map((connector) => (
                     <article className="connection-row" key={connector.id}>
@@ -382,7 +385,7 @@ export function DiscoverySettingsPage() {
                           {connector.configuration.default_country ? ` / ${connector.configuration.default_country}` : ""}
                         </span>
                       </div>
-                      <span className="protocol-label">{providerLabels[connector.provider_type].toUpperCase()}</span>
+                      <span className="protocol-label">{providerLabels[connector.provider_type]}</span>
                       <span className={`connection-status ${connector.status}`}>
                         {connector.status === "healthy" && <Check size={13} aria-hidden="true" />}
                         {statusLabels[connector.status]}
@@ -451,15 +454,13 @@ export function DiscoverySettingsPage() {
         </section>
 
         <aside className="routing-panel" aria-labelledby="discovery-boundaries-title">
-          <div className="panel-heading">
-            <div>
-              <span>02 / CONNECTOR BOUNDARIES</span>
-              <h2 id="discovery-boundaries-title">来源控制</h2>
-            </div>
-          </div>
-          <p className="routing-note">
-            连接器使用固定服务端点。这里不会接收自定义端点、代理、任意请求头或回调地址；每种服务最多保存 3 个连接器，停用项仍计入数量。
-          </p>
+          <SettingsSectionHeading
+            icon={ShieldCheck}
+            label="安全边界"
+            title="来源控制"
+            titleId="discovery-boundaries-title"
+            description="连接器使用固定服务端点；自定义端点、代理与回调地址均不会被接受。"
+          />
           <div className="role-list">
             <div className="role-row">
               <span><strong>凭据</strong><small>仅本地</small></span>

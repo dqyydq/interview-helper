@@ -7,6 +7,7 @@ import { appRouter } from "./app/router";
 import "./styles.css";
 import "./design-tokens.css";
 import "./report-visual-refactor.css";
+import "./settings-visual-refactor.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

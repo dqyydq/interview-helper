@@ -146,7 +146,7 @@ describe("ModelSettingsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /新建连接/ }));
     fireEvent.change(screen.getByLabelText("连接名称"), { target: { value: "主模型" } });
     fireEvent.change(screen.getByLabelText("模型名称"), { target: { value: "model-1" } });
-    fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "local-secret" } });
+    fireEvent.change(screen.getByLabelText("API 密钥"), { target: { value: "local-secret" } });
     fireEvent.click(screen.getByRole("button", { name: "保存加密连接" }));
 
     await waitFor(() => expect(modelConnectionApi.create).toHaveBeenCalledTimes(1));

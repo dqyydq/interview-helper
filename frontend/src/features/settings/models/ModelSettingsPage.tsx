@@ -14,6 +14,7 @@ import {
 import { type FormEvent, useState } from "react";
 
 import { SettingsTabs } from "../SettingsTabs";
+import { SettingsSectionHeading } from "../SettingsSectionHeading";
 import { modelConnectionApi } from "./api";
 import {
   modelRoles,
@@ -329,7 +330,7 @@ export function ModelSettingsPage() {
     <section className="settings-console" aria-labelledby="settings-title">
       <header className="settings-intro">
         <div>
-          <p className="eyebrow">LOCAL MODEL CONTROL</p>
+          <p className="eyebrow">本地模型与服务</p>
           <h1 id="settings-title">系统设置</h1>
           <p>
             每个 Agent 角色可使用不同模型。密钥只在本机后端加密保存，不会回传到浏览器。
@@ -339,7 +340,7 @@ export function ModelSettingsPage() {
           {readiness.data?.ready ? <ShieldCheck aria-hidden="true" /> : <AlertTriangle aria-hidden="true" />}
           <span>
             <strong>{readiness.data?.ready ? "面试链路已就绪" : "仍需完成必要绑定"}</strong>
-            <small>Interview / Evaluation routing</small>
+            <small>面试与评估链路</small>
           </span>
         </div>
       </header>
@@ -350,15 +351,18 @@ export function ModelSettingsPage() {
 
       <div className="settings-grid">
         <section className="connection-panel" aria-labelledby="connections-title">
-          <div className="panel-heading">
-            <div>
-              <span>01 / CONNECTIONS</span>
-              <h2 id="connections-title">模型连接</h2>
-            </div>
-            <button className="primary-button" type="button" onClick={() => setFormOpen(!formOpen)}>
-              <Plus size={16} aria-hidden="true" /> 新建连接
-            </button>
-          </div>
+          <SettingsSectionHeading
+            icon={Cpu}
+            label="连接管理"
+            title="模型连接"
+            titleId="connections-title"
+            description="添加并维护面试、评估、检索等任务使用的模型服务。"
+            action={(
+              <button className="primary-button" type="button" onClick={() => setFormOpen(!formOpen)}>
+                <Plus size={16} aria-hidden="true" /> 新建连接
+              </button>
+            )}
+          />
 
           {formOpen && (
             <form className="connection-form" onSubmit={submit}>
@@ -370,7 +374,7 @@ export function ModelSettingsPage() {
                     type="button"
                     onClick={() => updateProvider(type)}
                   >
-                    {type === "openai_compatible" ? "OpenAI-compatible" : "Anthropic-compatible"}
+                    {type === "openai_compatible" ? "OpenAI 兼容协议" : "Anthropic 兼容协议"}
                   </button>
                 ))}
               </div>
@@ -384,7 +388,7 @@ export function ModelSettingsPage() {
                 />
               </label>
               <label>
-                Base URL
+                服务地址（Base URL）
                 <input
                   required
                   type="url"
@@ -402,7 +406,7 @@ export function ModelSettingsPage() {
                 />
               </label>
               <label>
-                API Key
+                API 密钥
                 <input
                   required
                   type="password"
@@ -414,7 +418,7 @@ export function ModelSettingsPage() {
               </label>
               <div className="compact-fields">
                 <label>
-                  Context Window
+                  上下文窗口
                   <input
                     min={1024}
                     type="number"
@@ -425,7 +429,7 @@ export function ModelSettingsPage() {
                   />
                 </label>
                 <label>
-                  Max Output
+                  最大输出 Token
                   <input
                     min={1}
                     type="number"
@@ -444,7 +448,7 @@ export function ModelSettingsPage() {
                     setDraft({ ...draft, supports_prompt_caching: event.target.checked })
                   }
                 />
-                支持 Prompt Caching
+                支持提示词缓存
               </label>
               <label className="check-field">
                 <input
@@ -454,7 +458,7 @@ export function ModelSettingsPage() {
                     setDraft({ ...draft, supports_token_count_endpoint: event.target.checked })
                   }
                 />
-                支持官方 Token Count
+                支持官方 Token 计数接口
               </label>
               <div className="form-actions">
                 <button className="quiet-button" type="button" onClick={() => setFormOpen(false)}>
@@ -476,7 +480,7 @@ export function ModelSettingsPage() {
                   <span>{connection.model_name}</span>
                 </div>
                 <span className="protocol-label">
-                  {connection.provider_type === "openai_compatible" ? "OPENAI" : "ANTHROPIC"}
+                  {connection.provider_type === "openai_compatible" ? "OpenAI 协议" : "Anthropic 协议"}
                 </span>
                 <span className={`connection-status ${connection.status}`}>
                   {connection.status === "healthy" && <Check size={13} aria-hidden="true" />}
@@ -500,7 +504,7 @@ export function ModelSettingsPage() {
                       onClick={() => {
                         if (
                           window.confirm(
-                            `清除“${connection.name}”的 API Key 和额外请求头，并停用该连接？此操作不可撤销。`,
+                            `清除“${connection.name}”的 API 密钥和额外请求头，并停用该连接？此操作不可撤销。`,
                           )
                         ) {
                           redactConnection.mutate(connection.id);
@@ -531,15 +535,13 @@ export function ModelSettingsPage() {
           </div>
 
           <div className="local-capability-list" aria-labelledby="local-capabilities-title">
-            <div className="panel-heading">
-              <div>
-                <span>03 / LOCAL DOCKER</span>
-                <h2 id="local-capabilities-title">本地 AI 服务</h2>
-              </div>
-            </div>
-            <p className="routing-note">
-              先在终端安装已校验模型并启动对应 Docker profile；这里只检查固定的 loopback 服务，既不需要 API Key，也不会自动下载或启动容器。
-            </p>
+            <SettingsSectionHeading
+              icon={Cpu}
+              label="本地 Docker 服务"
+              title="本地 AI 服务"
+              titleId="local-capabilities-title"
+              description="仅检查固定的本机服务；不会下载模型、启动容器或读取 API 密钥。"
+            />
             {localCapabilities.data?.map((capability) => {
               const presentation = getLocalCapabilityPresentation(capability, localCapabilities.data);
               const latency = localLatencyLabel(capability);
@@ -559,7 +561,7 @@ export function ModelSettingsPage() {
                       {visibleStatus}{latency && !isChecking ? ` · ${latency}` : ""}
                     </span>
                   </div>
-                  <span className="protocol-label">{capability.runtime.toUpperCase()}</span>
+                  <span className="protocol-label">{capability.runtime}</span>
                   <span className={`connection-status ${presentation.displayStatus}`} aria-hidden="true">
                     {capability.status === "ready" && !isChecking && <Check size={13} aria-hidden="true" />}
                     {isChecking && <LoaderCircle className="local-capability-spinner" size={13} aria-hidden="true" />}
@@ -605,32 +607,35 @@ export function ModelSettingsPage() {
           </div>
 
           <section className="embedding-index-panel" aria-labelledby="embedding-index-title">
-            <div className="panel-heading">
-              <div>
-                <span>04 / SEMANTIC MEMORY</span>
-                <h2 id="embedding-index-title">语义索引</h2>
-              </div>
-              <button
-                className="secondary-button embedding-index-action"
-                type="button"
-                aria-busy={rebuildEmbeddingIndex.isPending}
-                disabled={
-                  !embeddingBinding
-                  || embeddingIndexUnavailableLocalTarget
-                  || embeddingIndexBusy
-                  || rebuildEmbeddingIndex.isPending
-                }
-                title={embeddingRebuildTitle}
-                onClick={() => rebuildEmbeddingIndex.mutate()}
-              >
-                {rebuildEmbeddingIndex.isPending || embeddingIndexBusy ? (
-                  <LoaderCircle className="local-capability-spinner" size={15} aria-hidden="true" />
-                ) : (
-                  <Database size={15} aria-hidden="true" />
-                )}
-                {rebuildLabel}
-              </button>
-            </div>
+            <SettingsSectionHeading
+              icon={Database}
+              label="语义检索"
+              title="语义索引"
+              titleId="embedding-index-title"
+              description="索引在后台增量构建，面试时会自动让出资源。"
+              action={(
+                <button
+                  className="secondary-button embedding-index-action"
+                  type="button"
+                  aria-busy={rebuildEmbeddingIndex.isPending}
+                  disabled={
+                    !embeddingBinding
+                    || embeddingIndexUnavailableLocalTarget
+                    || embeddingIndexBusy
+                    || rebuildEmbeddingIndex.isPending
+                  }
+                  title={embeddingRebuildTitle}
+                  onClick={() => rebuildEmbeddingIndex.mutate()}
+                >
+                  {rebuildEmbeddingIndex.isPending || embeddingIndexBusy ? (
+                    <LoaderCircle className="local-capability-spinner" size={15} aria-hidden="true" />
+                  ) : (
+                    <Database size={15} aria-hidden="true" />
+                  )}
+                  {rebuildLabel}
+                </button>
+              )}
+            />
             <article
               className={`embedding-index-status ${embeddingIndexBusy ? "building" : ""}`}
               role="status"
@@ -677,13 +682,13 @@ export function ModelSettingsPage() {
         </section>
 
         <aside className="routing-panel" aria-labelledby="routing-title">
-          <div className="panel-heading">
-            <div>
-              <span>02 / AGENT ROUTING</span>
-              <h2 id="routing-title">Agent 角色路由</h2>
-            </div>
-          </div>
-          <p className="routing-note">面试官与评估官必须显式绑定；上下文压缩未绑定时回退到规划模型。</p>
+          <SettingsSectionHeading
+            icon={ShieldCheck}
+            label="任务分配"
+            title="Agent 角色路由"
+            titleId="routing-title"
+            description="面试官与评估官需显式绑定；未配置的辅助角色会使用安全回退策略。"
+          />
           <div className="role-list">
             {modelRoles.map((role) => {
               const binding = bindings.data?.find((item) => item.role === role);
@@ -709,7 +714,7 @@ export function ModelSettingsPage() {
                 <label className="role-row" key={role}>
                   <span>
                     <strong>{roleLabels[role]}</strong>
-                    <small>{required ? "REQUIRED" : "OPTIONAL"}</small>
+                    <small>{required ? "必需" : "可选"}</small>
                   </span>
                   <span className="role-target-control">
                     <select

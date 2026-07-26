@@ -79,7 +79,7 @@ export function MemorySettingsPage() {
     <section className="settings-console memory-console" aria-labelledby="memory-title">
       <header className="settings-intro memory-intro">
         <div>
-          <p className="eyebrow">CONTROLLED INTERVIEW MEMORY</p>
+          <p className="eyebrow">记忆策略与控制</p>
           <h1 id="memory-title">长期记忆</h1>
           <p>管理 Agent 跨场使用的稳定信息。每条记忆都保留来源、状态和你的最终控制权。</p>
         </div>
@@ -103,7 +103,7 @@ export function MemorySettingsPage() {
 
       <div className="memory-workspace">
         <aside className="memory-filter" aria-label="记忆状态筛选">
-          <span className="memory-filter-label">STATUS INDEX</span>
+          <span className="memory-filter-label">记忆状态</span>
           {statusFilters.map((item) => (
             <button
               className={filter === item.value ? "active" : ""}
@@ -123,8 +123,8 @@ export function MemorySettingsPage() {
 
         <main className="memory-list" aria-live="polite">
           <div className="memory-list-heading">
-            <div><span>MEMORY REGISTER</span><h2>{statusFilters.find((item) => item.value === filter)?.label}</h2></div>
-            <small>{memories.data?.length ?? 0} ENTRIES</small>
+            <div><span>记忆列表</span><h2>{statusFilters.find((item) => item.value === filter)?.label}</h2></div>
+            <small>{memories.data?.length ?? 0} 条记录</small>
           </div>
 
           {memories.isLoading && <div className="memory-empty">正在读取可追溯记忆…</div>}
