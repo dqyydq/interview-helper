@@ -43,10 +43,94 @@ from app.schemas.evaluation import (
     PracticeAction,
     QuestionEvaluationPublic,
     ReportListItem,
+    StyleProfilePublic,
+    StyleProfileSourceSummary,
 )
 from app.services.model_connections import resolve_role_connection
 
 BASE_DIMENSIONS = ["technical_depth", "problem_solving", "communication"]
+_STYLE_PROFILE_TRUST_STATUSES = frozenset({"template", "draft", "source_backed"})
+
+
+def _style_profile_snapshot(plan: InterviewPlan | None) -> StyleProfilePublic:
+    """Read the immutable plan snapshot without trusting malformed legacy JSON.
+
+    A report must never turn a missing or invalid snapshot into an assertion
+    about a real company's hiring process. The returned generic template state
+    is deliberately safe for reports created before this P0 contract existed.
+    """
+
+    plan_snapshot = plan.plan_snapshot if plan and isinstance(plan.plan_snapshot, dict) else {}
+    raw_trust = plan_snapshot.get("style_pack_trust")
+    trust_snapshot = raw_trust if isinstance(raw_trust, dict) else {}
+    has_legacy_trust = any(
+        key in plan_snapshot
+        for key in ("style_pack_trust_status", "style_pack_evidence_count")
+    )
+    snapshot_available = isinstance(raw_trust, dict) or has_legacy_trust
+
+    raw_status = trust_snapshot.get(
+        "trust_status",
+        plan_snapshot.get("style_pack_trust_status"),
+    )
+    trust_status = (
+        raw_status
+        if isinstance(raw_status, str) and raw_status in _STYLE_PROFILE_TRUST_STATUSES
+        else "template"
+    )
+
+    raw_evidence_count = trust_snapshot.get(
+        "evidence_count",
+        plan_snapshot.get("style_pack_evidence_count"),
+    )
+    evidence_count = (
+        raw_evidence_count
+        if isinstance(raw_evidence_count, int)
+        and not isinstance(raw_evidence_count, bool)
+        and raw_evidence_count >= 0
+        else 0
+    )
+
+    raw_version = plan_snapshot.get("style_pack_version")
+    version = (
+        raw_version
+        if isinstance(raw_version, int)
+        and not isinstance(raw_version, bool)
+        and raw_version >= 1
+        else None
+    )
+    raw_latest_evidence_at = trust_snapshot.get("latest_evidence_at")
+    latest_evidence_at = (
+        raw_latest_evidence_at if isinstance(raw_latest_evidence_at, str) else None
+    )
+
+    source_summaries: list[StyleProfileSourceSummary] = []
+    raw_sources = trust_snapshot.get("source_summaries")
+    if isinstance(raw_sources, list):
+        for item in raw_sources[:3]:
+            if not isinstance(item, dict):
+                continue
+            title = item.get("title")
+            if not isinstance(title, str) or not title.strip():
+                continue
+            url = item.get("url")
+            excerpt = item.get("excerpt")
+            source_summaries.append(
+                StyleProfileSourceSummary(
+                    title=title,
+                    url=url if isinstance(url, str) else None,
+                    excerpt=excerpt if isinstance(excerpt, str) else None,
+                )
+            )
+
+    return StyleProfilePublic(
+        snapshot_available=snapshot_available,
+        trust_status=trust_status,
+        version=version,
+        evidence_count=evidence_count,
+        latest_evidence_at=latest_evidence_at,
+        source_summaries=source_summaries,
+    )
 
 
 async def get_report(
@@ -245,6 +329,11 @@ async def _trend_comparison(
     config: InterviewConfig,
     current_report_id: uuid.UUID,
 ) -> dict:
+    if not interview.include_in_trends:
+        return {
+            "included_in_trends": False,
+            "note": "This trial or focused practice session is excluded from long-term trends.",
+        }
     previous = list(
         (
             await session.scalars(
@@ -256,6 +345,8 @@ async def _trend_comparison(
                     EvaluationReport.id != current_report_id,
                     EvaluationReport.status == EvaluationStatus.COMPLETED,
                     InterviewSession.profile_id == interview.profile_id,
+                    InterviewSession.include_in_trends.is_(True),
+                    InterviewSession.deleted_at.is_(None),
                     InterviewConfig.company_id == config.company_id,
                     InterviewConfig.role_name == config.role_name,
                     EvaluationReport.deleted_at.is_(None),
@@ -272,6 +363,34 @@ async def _trend_comparison(
         "previous_overall_anchors": [str(item.overall_anchor) for item in previous],
         "note": "趋势仅比较同公司、同岗位的已完成场次，不参与本场评分。",
     }
+
+
+async def refresh_report_trend_comparison(
+    session: AsyncSession,
+    interview: InterviewSession,
+) -> EvaluationReport | None:
+    """Recalculate only derived trend metadata after a user inclusion change."""
+
+    report = await session.scalar(
+        select(EvaluationReport).where(
+            EvaluationReport.session_id == interview.id,
+            EvaluationReport.deleted_at.is_(None),
+        )
+    )
+    if not report:
+        return None
+    plan = await session.get(InterviewPlan, interview.plan_id)
+    config = await session.get(InterviewConfig, plan.config_id) if plan else None
+    if not config:
+        return report
+    report.trend_comparison = await _trend_comparison(
+        session,
+        interview=interview,
+        config=config,
+        current_report_id=report.id,
+    )
+    report.touch()
+    return report
 
 
 async def evaluate_interview(
@@ -438,6 +557,14 @@ async def report_public(
     session: AsyncSession,
     report: EvaluationReport,
 ) -> EvaluationReportPublic:
+    interview = await session.get(InterviewSession, report.session_id)
+    if not interview:
+        raise AppError(
+            code="interview_session_not_found",
+            message="Interview session is unavailable for this report.",
+            status_code=404,
+        )
+    plan = await session.get(InterviewPlan, interview.plan_id)
     questions = list(
         (
             await session.scalars(
@@ -522,6 +649,8 @@ async def report_public(
         updated_at=report.updated_at,
         version=report.version,
         session_id=report.session_id,
+        session_kind=interview.session_kind,
+        include_in_trends=interview.include_in_trends,
         status=report.status,
         overall_anchor=report.overall_anchor,
         overview=report.overview,
@@ -529,6 +658,7 @@ async def report_public(
         gaps=list(report.gaps),
         action_plan=[PracticeAction.model_validate(item) for item in report.action_plan],
         trend_comparison=report.trend_comparison,
+        style_profile=_style_profile_snapshot(plan),
         completed_at=report.updated_at if report.status == EvaluationStatus.COMPLETED else None,
         questions=[
             QuestionEvaluationPublic(
@@ -598,6 +728,7 @@ async def list_reports(
         await session.execute(
             select(
                 EvaluationReport,
+                InterviewSession,
                 InterviewConfig,
                 Company,
                 RoundProfile,
@@ -618,6 +749,8 @@ async def list_reports(
         ReportListItem(
             report_id=report.id,
             session_id=report.session_id,
+            session_kind=interview.session_kind,
+            include_in_trends=interview.include_in_trends,
             status=report.status,
             overall_anchor=report.overall_anchor,
             overview=report.overview,
@@ -627,7 +760,7 @@ async def list_reports(
             round_name=round_profile.name,
             role_name=config.role_name,
         )
-        for report, config, company, round_profile in rows
+        for report, interview, config, company, round_profile in rows
     ]
 
 

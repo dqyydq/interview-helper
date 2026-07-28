@@ -4,6 +4,8 @@ import type {
   CoachResponse,
   EvaluationJob,
   EvaluationReport,
+  PracticeTask,
+  PracticeTaskStatus,
   ReportListItem,
 } from "./types";
 
@@ -14,6 +16,26 @@ export const reportApi = {
     apiRequest<EvaluationReport>(`/interview-sessions/${sessionId}/report`),
   retry: (reportId: string) =>
     apiRequest<EvaluationJob>(`/reports/${reportId}/retry`, { method: "POST" }),
+  listPracticeTasks: (status?: PracticeTaskStatus) =>
+    apiRequest<PracticeTask[]>(
+      `/practice-tasks${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+    ),
+  getPracticeTask: (taskId: string) => apiRequest<PracticeTask>(`/practice-tasks/${taskId}`),
+  createPracticeTasks: (reportId: string, actionIndices: number[]) =>
+    apiRequest<PracticeTask[]>(`/reports/${reportId}/practice-tasks`, {
+      method: "POST",
+      body: JSON.stringify({ action_indices: actionIndices }),
+    }),
+  updatePracticeTask: (taskId: string, status: PracticeTaskStatus) =>
+    apiRequest<PracticeTask>(`/practice-tasks/${taskId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+  updateTrendInclusion: (sessionId: string, includeInTrends: boolean) =>
+    apiRequest<{ include_in_trends?: boolean }>(`/interview-sessions/${sessionId}/trend-inclusion`, {
+      method: "PATCH",
+      body: JSON.stringify({ include_in_trends: includeInTrends }),
+    }),
   coach: ({
     reportId,
     mode,

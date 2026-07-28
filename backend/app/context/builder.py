@@ -96,6 +96,10 @@ async def _load_style_state(
             "capability_tags": current.capability_tags,
             "follow_up_index": context.current_follow_up_index,
             "follow_up_budget": current.follow_up_budget,
+            # This is a bounded controller hint, never a new question or a
+            # hidden score. It is cleared as soon as the assistant turn is
+            # persisted, so it cannot leak across planned main questions.
+            "turn_direction": (context.state_payload or {}).get("turn_decision", {}),
         },
         "unresolved_points": context.unresolved_points,
         "interviewer_style": (style_pack.default_interviewer_behavior if style_pack else {}),

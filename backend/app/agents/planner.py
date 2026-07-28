@@ -24,6 +24,8 @@ omit a candidate key. Use every supplied candidate exactly once. Allocate exactl
 requested duration, retain each candidate's maximum follow-up budget, and report the
 complete capability coverage represented by the chosen candidates. The company/round
 style is guidance for ordering and timing, not a claim of an official hiring standard.
+When a user-confirmed practice focus is supplied, use it only to prioritize the order
+and emphasis of the supplied candidates; it never authorizes invented questions.
 Return only JSON matching the provided schema.
 """
 
@@ -40,7 +42,7 @@ class PlannerResult:
 
 
 def _candidate_payload(candidate: PlanCandidate) -> dict[str, Any]:
-    return {
+    payload = {
         "candidate_key": candidate.stable_key,
         "prompt": candidate.prompt,
         "source_type": candidate.source_type.value,
@@ -48,6 +50,7 @@ def _candidate_payload(candidate: PlanCandidate) -> dict[str, Any]:
         "max_follow_up_budget": candidate.follow_up_budget,
         "selection_context": candidate.selection_reason,
     }
+    return payload
 
 
 def build_planner_payload(
@@ -57,11 +60,12 @@ def build_planner_payload(
     role_name: str,
     role_matrix: RoleMatrix,
     resume_summary: dict[str, Any] | None,
+    practice_focus: dict[str, Any] | None,
     duration_seconds: int,
 ) -> dict[str, Any]:
     """Build the bounded planning context without exposing the wider database."""
 
-    return {
+    payload = {
         "contract": {
             "duration_seconds": duration_seconds,
             "target_question_count": len(candidates),
@@ -84,6 +88,11 @@ def build_planner_payload(
         "resume_summary": resume_summary,
         "candidate_pool": [_candidate_payload(candidate) for candidate in candidates],
     }
+    # Keep the ordinary planner boundary byte-for-byte minimal. This user-
+    # confirmed report snapshot exists only for a targeted-practice plan.
+    if practice_focus is not None:
+        payload["practice_focus"] = practice_focus
+    return payload
 
 
 def _candidate_map(candidates: list[PlanCandidate]) -> dict[str, PlanCandidate]:
@@ -146,6 +155,7 @@ async def run_planner(
     role_name: str,
     role_matrix: RoleMatrix,
     resume_summary: dict[str, Any] | None,
+    practice_focus: dict[str, Any] | None = None,
     duration_seconds: int,
     context_window_tokens: int,
     max_output_tokens: int,
@@ -167,6 +177,7 @@ async def run_planner(
         role_name=role_name,
         role_matrix=role_matrix,
         resume_summary=resume_summary,
+        practice_focus=practice_focus,
         duration_seconds=duration_seconds,
     )
     user_content = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

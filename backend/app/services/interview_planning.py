@@ -2,15 +2,24 @@ import uuid
 from collections import Counter
 
 import structlog
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.planner import PlannerResult, PlannerSemanticError, run_planner
 from app.api.errors import AppError
-from app.db.models.common import JobStatus, JobType, ModelRole, PlanStatus, ResumeParseStatus
-from app.db.models.company import Company, CompanyStylePack, RoundProfile
+from app.db.models.common import (
+    ContentStatus,
+    JobStatus,
+    JobType,
+    ModelRole,
+    PlanStatus,
+    ResumeParseStatus,
+    SessionKind,
+)
+from app.db.models.company import Company, CompanyStylePack, EvidenceItem, RoundProfile
 from app.db.models.interview import InterviewConfig, InterviewPlan, PlanQuestion
 from app.db.models.job import BackgroundJob
+from app.db.models.practice import PracticeTask
 from app.db.models.question import QuestionBank
 from app.db.models.resume import Resume, ResumeClaim
 from app.providers.base import ProviderError
@@ -25,6 +34,7 @@ from app.schemas.interview_plan import (
     PlanQuestionPublic,
 )
 from app.services.model_connections import resolve_role_connection
+from app.services.practice_tasks import get_plannable_practice_task, planner_focus
 from app.services.question_retrieval import PlanCandidate, build_candidate_pool, select_candidates
 from app.services.role_matrix import RoleMatrix, load_role_matrix
 
@@ -99,7 +109,7 @@ async def _validate_sources(
     session: AsyncSession,
     profile_id: uuid.UUID,
     payload: InterviewPlanCreate,
-) -> tuple[CompanyStylePack, RoundProfile]:
+) -> tuple[CompanyStylePack, RoundProfile, PracticeTask | None]:
     company = await session.scalar(
         select(Company).where(
             Company.id == payload.company_id,
@@ -157,7 +167,12 @@ async def _validate_sources(
                 message="简历尚未解析完成",
                 status_code=409,
             )
-    return style_pack, round_profile
+    practice_task = await get_plannable_practice_task(
+        session,
+        profile_id,
+        payload.practice_task_id,
+    )
+    return style_pack, round_profile, practice_task
 
 
 async def create_plan_job(
@@ -165,13 +180,18 @@ async def create_plan_job(
     profile_id: uuid.UUID,
     payload: InterviewPlanCreate,
 ) -> InterviewPlanCreateResult:
-    style_pack, round_profile = await _validate_sources(session, profile_id, payload)
+    style_pack, round_profile, practice_task = await _validate_sources(session, profile_id, payload)
+    session_kind = SessionKind(payload.session_kind)
+    practice_focus = planner_focus(practice_task)
+    style_trust = await _style_pack_trust_snapshot(session, style_pack)
     config = InterviewConfig(
         profile_id=profile_id,
         company_id=payload.company_id,
         round_profile_id=payload.round_profile_id,
         resume_id=payload.resume_id,
         role_name=payload.role_name,
+        session_kind=session_kind,
+        practice_task_id=payload.practice_task_id,
         duration_minutes=payload.duration_minutes,
         target_question_count=payload.target_question_count,
         question_bank_ids=[str(item) for item in payload.question_bank_ids],
@@ -189,6 +209,10 @@ async def create_plan_job(
             "phase": "queued",
             "round_name": round_profile.name,
             "style_pack_version": style_pack.pack_version,
+            "style_pack_trust": style_trust,
+            "session_kind": session_kind.value,
+            "include_in_trends_default": session_kind == SessionKind.STANDARD,
+            "practice_focus": practice_focus,
         },
     )
     session.add(plan)
@@ -210,6 +234,59 @@ async def create_plan_job(
         plan=await plan_public(session, plan),
         job=job_public(job),
     )
+
+
+async def _style_pack_trust_snapshot(
+    session: AsyncSession,
+    style_pack: CompanyStylePack,
+) -> dict:
+    """Freeze the selected style pack's existing provenance with a plan.
+
+    This only copies the user's already-stored, private evidence summaries. It
+    never fetches, exposes, or promotes a source to an official hiring fact.
+    """
+
+    evidence_count = int(
+        await session.scalar(
+            select(func.count(EvidenceItem.id)).where(
+                EvidenceItem.style_pack_id == style_pack.id,
+                EvidenceItem.deleted_at.is_(None),
+            )
+        )
+        or 0
+    )
+    evidence = list(
+        (
+            await session.scalars(
+                select(EvidenceItem)
+                .where(
+                    EvidenceItem.style_pack_id == style_pack.id,
+                    EvidenceItem.deleted_at.is_(None),
+                )
+                .order_by(EvidenceItem.fetched_at.desc(), EvidenceItem.created_at.desc())
+                .limit(3)
+            )
+        ).all()
+    )
+    if evidence_count:
+        trust_status = "source_backed"
+    elif ContentStatus(style_pack.status) == ContentStatus.DRAFT:
+        trust_status = "draft"
+    else:
+        trust_status = "template"
+    return {
+        "trust_status": trust_status,
+        "evidence_count": evidence_count,
+        "latest_evidence_at": evidence[0].fetched_at.isoformat() if evidence else None,
+        "source_summaries": [
+            {
+                "title": item.source_title,
+                "url": item.source_url,
+                "excerpt": item.excerpt,
+            }
+            for item in evidence
+        ],
+    }
 
 
 def _round_context(style_pack: CompanyStylePack, round_profile: RoundProfile) -> dict:
@@ -298,6 +375,7 @@ async def _try_model_plan(
     role_name: str,
     role_matrix: RoleMatrix,
     resume_summary: dict | None,
+    practice_focus: dict | None,
     total_seconds: int,
 ) -> tuple[PlannerResult | None, str | None]:
     """Run the bound Planner role; callers retain a deterministic local fallback."""
@@ -313,6 +391,7 @@ async def _try_model_plan(
             role_name=role_name,
             role_matrix=role_matrix,
             resume_summary=resume_summary,
+            practice_focus=practice_focus,
             duration_seconds=total_seconds,
             context_window_tokens=connection.context_window_tokens,
             max_output_tokens=connection.max_output_tokens,
@@ -389,6 +468,11 @@ async def generate_plan(session: AsyncSession, plan_id: uuid.UUID) -> InterviewP
         role_name=config.role_name,
         role_matrix=role_matrix,
         resume_summary=await _resume_summary(session, config.resume_id),
+        practice_focus=(
+            plan.plan_snapshot.get("practice_focus")
+            if isinstance(plan.plan_snapshot.get("practice_focus"), dict)
+            else None
+        ),
         total_seconds=total_seconds,
     )
     if model_result:

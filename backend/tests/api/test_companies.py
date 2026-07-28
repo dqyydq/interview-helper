@@ -62,6 +62,8 @@ async def test_company_round_evidence_and_revision_lifecycle() -> None:
         style_pack = company["latest_style_pack"]
         assert style_pack["status"] == "draft"
         assert style_pack["evidence_count"] == 0
+        assert style_pack["trust_status"] == "draft"
+        assert style_pack["latest_evidence_at"] is None
         assert len(style_pack["rounds"]) == 2
 
         evidence = await client.post(
@@ -79,6 +81,8 @@ async def test_company_round_evidence_and_revision_lifecycle() -> None:
         detail = await client.get(f"/api/companies/{company_id}")
         assert detail.json()["latest_style_pack"]["evidence_count"] == 1
         assert detail.json()["latest_style_pack"]["evidence_label"] == "有来源支持"
+        assert detail.json()["latest_style_pack"]["trust_status"] == "source_backed"
+        assert detail.json()["latest_style_pack"]["latest_evidence_at"] is not None
 
         activated = await client.post(f"/api/style-packs/{style_pack['id']}/activate")
         assert activated.status_code == 200

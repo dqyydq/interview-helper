@@ -39,6 +39,7 @@ from app.db.models.interview import (
 from app.db.models.job import BackgroundJob
 from app.db.models.memory import MemoryConflict, MemoryItem, MemorySource, MemoryUsage
 from app.db.models.model_connection import ModelConnection, ModelRoleBinding
+from app.db.models.practice import PracticeTask
 from app.db.models.profile import UserProfile
 from app.db.models.question import (
     Question,
@@ -78,6 +79,7 @@ __all__ = [
     "ModelRoleBinding",
     "PlanQuestion",
     "PlanQuestionEmbedding",
+    "PracticeTask",
     "Question",
     "QuestionBank",
     "QuestionDiscoveryCandidate",

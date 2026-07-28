@@ -65,7 +65,8 @@ async def test_all_metadata_tables_exist_in_postgresql() -> None:
         )
 
     assert set(SQLModel.metadata.tables) <= database_tables
-    assert len(SQLModel.metadata.tables) == 46
+    # PracticeTask adds the private, user-confirmed training queue table.
+    assert len(SQLModel.metadata.tables) == 47
 
 
 @pytest.mark.asyncio

@@ -60,6 +60,7 @@ def test_client_protocol_declares_resume_stt_commit_and_session_controls() -> No
         "user.transcript.partial",
         "user.answer.commit",
         "user.text.submit",
+        "turn.retry",
         "session.pause",
         "session.finish",
     ]

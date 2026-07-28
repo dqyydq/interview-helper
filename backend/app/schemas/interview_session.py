@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import Field
 
-from app.db.models.common import MessageRole, SessionStatus
+from app.db.models.common import MessageRole, SessionKind, SessionStatus
 from app.schemas.common import ApiModel, EntityPublic
 from app.schemas.interview_plan import InterviewPlanPublic
 
@@ -11,6 +11,10 @@ from app.schemas.interview_plan import InterviewPlanPublic
 class InterviewSessionCreate(ApiModel):
     plan_id: uuid.UUID
     excluded_memory_ids: list[uuid.UUID] = Field(default_factory=list)
+
+
+class TrendInclusionUpdate(ApiModel):
+    include_in_trends: bool
 
 
 class InterviewMessagePublic(EntityPublic):
@@ -28,6 +32,8 @@ class InterviewMessagePublic(EntityPublic):
 class InterviewSessionPublic(EntityPublic):
     plan_id: uuid.UUID
     status: SessionStatus
+    session_kind: SessionKind
+    include_in_trends: bool
     started_at: datetime | None
     ended_at: datetime | None
     current_question_sequence: int | None

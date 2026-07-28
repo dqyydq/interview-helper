@@ -10,6 +10,7 @@ ClientEventType = Literal[
     "user.transcript.partial",
     "user.answer.commit",
     "user.text.submit",
+    "turn.retry",
     "session.pause",
     "session.finish",
 ]

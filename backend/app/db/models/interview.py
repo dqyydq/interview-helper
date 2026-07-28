@@ -10,6 +10,7 @@ from app.db.models.common import (
     EntityBase,
     MessageRole,
     PlanStatus,
+    SessionKind,
     SessionStatus,
     SourceType,
 )
@@ -40,6 +41,16 @@ class InterviewConfig(EntityBase, table=True):
         index=True,
     )
     role_name: str = Field(min_length=1, max_length=160)
+    session_kind: SessionKind = Field(
+        default=SessionKind.STANDARD,
+        sa_column=Column(String(32), nullable=False, index=True),
+    )
+    practice_task_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="practice_tasks.id",
+        ondelete="SET NULL",
+        index=True,
+    )
     duration_minutes: int = Field(default=45, ge=10, le=240)
     target_question_count: int = Field(default=6, ge=1, le=50)
     question_bank_ids: list = Field(default_factory=list, sa_type=JSONB, nullable=False)
@@ -118,6 +129,11 @@ class InterviewSession(EntityBase, table=True):
         default=SessionStatus.READY,
         sa_column=Column(String(32), nullable=False, index=True),
     )
+    session_kind: SessionKind = Field(
+        default=SessionKind.STANDARD,
+        sa_column=Column(String(32), nullable=False, index=True),
+    )
+    include_in_trends: bool = Field(default=True, nullable=False, index=True)
     started_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     ended_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     current_question_sequence: int | None = Field(default=None, ge=1)

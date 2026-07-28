@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field, model_validator
 
-from app.db.models.common import EvaluationAnchor, EvaluationStatus, JobStatus
+from app.db.models.common import EvaluationAnchor, EvaluationStatus, JobStatus, SessionKind
 from app.schemas.common import ApiModel, EntityPublic
 
 
@@ -124,8 +125,37 @@ class DimensionEvaluationPublic(EntityPublic):
     confidence: float
 
 
+StyleProfileTrustStatus = Literal["template", "draft", "source_backed"]
+
+
+class StyleProfileSourceSummary(ApiModel):
+    """A private, frozen source summary attached to a completed interview plan."""
+
+    title: str
+    url: str | None = None
+    excerpt: str | None = None
+
+
+class StyleProfilePublic(ApiModel):
+    """The provenance boundary for the style pack used in this interview.
+
+    Older reports predate immutable style-pack trust snapshots. They receive a
+    safe generic default instead of implying that an unverifiable profile is
+    source-backed.
+    """
+
+    snapshot_available: bool = False
+    trust_status: StyleProfileTrustStatus = "template"
+    version: int | None = Field(default=None, ge=1)
+    evidence_count: int = Field(default=0, ge=0)
+    latest_evidence_at: str | None = None
+    source_summaries: list[StyleProfileSourceSummary] = Field(default_factory=list)
+
+
 class EvaluationReportPublic(EntityPublic):
     session_id: uuid.UUID
+    session_kind: SessionKind
+    include_in_trends: bool
     status: EvaluationStatus
     overall_anchor: EvaluationAnchor
     overview: str | None
@@ -133,6 +163,7 @@ class EvaluationReportPublic(EntityPublic):
     gaps: list[str]
     action_plan: list[PracticeAction]
     trend_comparison: dict
+    style_profile: StyleProfilePublic = Field(default_factory=StyleProfilePublic)
     completed_at: datetime | None = None
     questions: list[QuestionEvaluationPublic]
     dimensions: list[DimensionEvaluationPublic]
@@ -143,6 +174,8 @@ class EvaluationReportPublic(EntityPublic):
 class ReportListItem(ApiModel):
     report_id: uuid.UUID
     session_id: uuid.UUID
+    session_kind: SessionKind
+    include_in_trends: bool
     status: EvaluationStatus
     overall_anchor: EvaluationAnchor
     overview: str | None

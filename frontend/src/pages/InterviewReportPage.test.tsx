@@ -13,6 +13,10 @@ vi.mock("../features/reports/api", () => ({
     get: vi.fn(),
     retry: vi.fn(),
     coach: vi.fn(),
+    listPracticeTasks: vi.fn(),
+    createPracticeTasks: vi.fn(),
+    updatePracticeTask: vi.fn(),
+    updateTrendInclusion: vi.fn(),
     jobEventsUrl: vi.fn(),
   },
 }));
@@ -33,6 +37,20 @@ const report: EvaluationReport = {
       priority: 1,
     },
   ],
+  style_profile: {
+    snapshot_available: true,
+    trust_status: "source_backed",
+    version: 3,
+    evidence_count: 2,
+    latest_evidence_at: "2026-07-18T10:00:00Z",
+    source_summaries: [
+      {
+        title: "公开面试经验摘要",
+        url: "https://example.test/interview-summary",
+        excerpt: "聚焦系统设计与技术追问。",
+      },
+    ],
+  },
   trend_comparison: {},
   completed_at: "2026-07-19T10:00:00Z",
   questions: [
@@ -97,6 +115,8 @@ describe("InterviewReportPage", () => {
     });
     vi.mocked(reportApi.get).mockResolvedValue(report);
     vi.mocked(reportApi.list).mockResolvedValue([]);
+    vi.mocked(reportApi.listPracticeTasks).mockResolvedValue([]);
+    vi.mocked(reportApi.createPracticeTasks).mockResolvedValue([]);
     vi.mocked(reportApi.coach).mockResolvedValue({
       mode: "rewrite",
       title: "更完整的重答",
@@ -135,6 +155,15 @@ describe("InterviewReportPage", () => {
     expect(screen.queryByText(/offer|录用概率/i)).not.toBeInTheDocument();
   });
 
+  it("shows the frozen company-style provenance as a simulation boundary", async () => {
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "本场公司画像边界" })).toBeInTheDocument();
+    expect(screen.getByText("有来源支持")).toBeInTheDocument();
+    expect(screen.getByText(/风格包 v3.*2 条证据/)).toBeInTheDocument();
+    expect(screen.getByText(/不代表公司官方面试标准/)).toBeInTheDocument();
+  });
+
   it("labels the original answer separately from the coach suggestion", async () => {
     renderPage();
     await screen.findByRole("heading", { name: "复盘教练" });
@@ -146,5 +175,15 @@ describe("InterviewReportPage", () => {
     expect(await screen.findByText("用户原回答")).toBeInTheDocument();
     expect(screen.getByText("建议答案")).toBeInTheDocument();
     expect(screen.getByText(/先说明预算/)).toBeInTheDocument();
+  });
+
+  it("only writes selected report recommendations to the private training queue", async () => {
+    renderPage();
+
+    await screen.findByRole("heading", { name: "专项练习计划" });
+    fireEvent.click(screen.getByRole("checkbox", { name: "加入队列" }));
+    fireEvent.click(screen.getByRole("button", { name: "加入训练队列（1）" }));
+
+    await waitFor(() => expect(reportApi.createPracticeTasks).toHaveBeenCalledWith("report-1", [0]));
   });
 });

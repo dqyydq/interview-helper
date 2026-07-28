@@ -6,6 +6,7 @@ from app.api.deps import SessionDep
 from app.schemas.interview_session import (
     InterviewSessionCreate,
     InterviewSessionPublic,
+    TrendInclusionUpdate,
 )
 from app.services import interview_sessions as service
 from app.services.model_connections import ensure_local_profile
@@ -79,4 +80,20 @@ async def finish_interview_session(
     profile = await ensure_local_profile(session)
     interview = await service.get_session(session, profile.id, session_id)
     interview = await service.finish_session(session, interview)
+    return await service.session_public(session, interview)
+
+
+@router.patch("/{session_id}/trend-inclusion", response_model=InterviewSessionPublic)
+async def update_session_trend_inclusion(
+    session_id: uuid.UUID,
+    payload: TrendInclusionUpdate,
+    session: SessionDep,
+) -> InterviewSessionPublic:
+    profile = await ensure_local_profile(session)
+    interview = await service.get_session(session, profile.id, session_id)
+    interview = await service.update_trend_inclusion(
+        session,
+        interview,
+        include_in_trends=payload.include_in_trends,
+    )
     return await service.session_public(session, interview)

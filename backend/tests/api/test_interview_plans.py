@@ -453,3 +453,40 @@ async def test_plan_rejects_round_from_another_company() -> None:
 
     assert response.status_code == 404
     assert response.json()["code"] == "round_profile_not_found"
+
+
+@pytest.mark.asyncio
+async def test_quick_trial_is_fixed_to_ten_minutes_and_excluded_from_trends() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        company = (await client.post("/api/companies", json=company_payload())).json()
+        created = await client.post(
+            "/api/interview-plans",
+            json={
+                "company_id": company["id"],
+                "round_profile_id": company["latest_style_pack"]["rounds"][0]["id"],
+                # These intentionally non-preset values must not turn a quick
+                # trial into an unlabelled normal interview.
+                "duration_minutes": 45,
+                "target_question_count": 6,
+                "session_kind": "quick_trial",
+            },
+        )
+        assert created.status_code == 202
+        queued_plan = created.json()["plan"]
+        assert queued_plan["config"]["session_kind"] == "quick_trial"
+        assert queued_plan["config"]["duration_minutes"] == 10
+        assert queued_plan["config"]["target_question_count"] == 2
+        assert queued_plan["plan_snapshot"]["include_in_trends_default"] is False
+
+        assert await run_plan_once("quick-trial-planner") is True
+        started = await client.post(
+            "/api/interview-sessions",
+            json={"plan_id": queued_plan["id"]},
+        )
+
+    assert started.status_code == 201
+    assert started.json()["session_kind"] == "quick_trial"
+    assert started.json()["include_in_trends"] is False

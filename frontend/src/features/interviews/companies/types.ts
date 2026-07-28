@@ -23,6 +23,10 @@ export interface CompanyStylePack {
   visibility: "private" | "unlisted" | "public";
   evidence_count: number;
   evidence_label: string;
+  /** The evidence boundary displayed anywhere this profile is used. */
+  trust_status?: "template" | "draft" | "source_backed";
+  latest_evidence_at?: string | null;
+  evidence?: EvidenceItem[];
   rounds: RoundProfile[];
 }
 

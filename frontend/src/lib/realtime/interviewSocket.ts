@@ -23,6 +23,7 @@ type ClientEventType =
   | "user.transcript.partial"
   | "user.answer.commit"
   | "user.text.submit"
+  | "turn.retry"
   | "session.pause"
   | "session.finish";
 
@@ -39,27 +40,33 @@ export class InterviewSocket {
   private closed = false;
   private clientSequence = 0;
   private pendingAnswer: ClientEvent | null = null;
+  private reconnectAttempt = 0;
   lastSequence = 0;
 
   constructor(
     private readonly sessionId: string,
     private readonly onEvent: (event: ServerEvent) => void,
-    private readonly onState: (state: "connecting" | "connected" | "reconnecting") => void,
+    private readonly onState: (
+      state: "connecting" | "connected" | "reconnecting",
+      reconnectAttempt?: number,
+    ) => void,
   ) {}
 
   connect() {
     this.closed = false;
+    this.reconnectAttempt = 0;
     this.open("connecting");
   }
 
   private open(state: "connecting" | "reconnecting") {
-    this.onState(state);
+    this.onState(state, this.reconnectAttempt);
     const url = new URL(apiBaseUrl);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     url.pathname = `${url.pathname}/interviews/${this.sessionId}/live`;
     url.search = `last_sequence=${this.lastSequence}`;
     this.socket = new WebSocket(url);
     this.socket.onopen = () => {
+      this.reconnectAttempt = 0;
       this.onState("connected");
       if (this.pendingAnswer) this.socket?.send(JSON.stringify(this.pendingAnswer));
     };
@@ -76,7 +83,10 @@ export class InterviewSocket {
     };
     this.socket.onclose = () => {
       if (this.closed) return;
-      this.reconnectTimer = window.setTimeout(() => this.open("reconnecting"), 800);
+      this.reconnectAttempt += 1;
+      const delay = Math.min(800 * 2 ** (this.reconnectAttempt - 1), 8_000);
+      this.onState("reconnecting", this.reconnectAttempt);
+      this.reconnectTimer = window.setTimeout(() => this.open("reconnecting"), delay);
     };
   }
 

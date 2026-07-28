@@ -10,6 +10,7 @@ from app.db.models.common import (
     JobType,
     MessageRole,
     PlanStatus,
+    SessionKind,
     SessionStatus,
     SummaryValidationStatus,
     utc_now,
@@ -36,6 +37,7 @@ from app.schemas.context import (
 )
 from app.schemas.interview_session import InterviewMessagePublic, InterviewSessionPublic
 from app.services.interview_planning import plan_public
+from app.services.practice_tasks import link_task_to_session
 
 
 async def get_session(
@@ -89,6 +91,8 @@ async def session_public(
         version=interview.version,
         plan_id=interview.plan_id,
         status=interview.status,
+        session_kind=interview.session_kind,
+        include_in_trends=interview.include_in_trends,
         started_at=interview.started_at,
         ended_at=interview.ended_at,
         current_question_sequence=interview.current_question_sequence,
@@ -213,6 +217,13 @@ async def create_session(
         raise AppError(code="interview_plan_not_found", message="面试计划不存在", status_code=404)
     if plan.status not in {PlanStatus.READY, PlanStatus.FROZEN}:
         raise AppError(code="interview_plan_not_ready", message="面试计划尚未就绪", status_code=409)
+    config = await session.get(InterviewConfig, plan.config_id)
+    if not config:
+        raise AppError(
+            code="interview_config_not_found",
+            message="Interview configuration is unavailable.",
+            status_code=404,
+        )
     questions = list(
         (
             await session.scalars(
@@ -232,9 +243,17 @@ async def create_session(
         profile_id=profile_id,
         plan_id=plan.id,
         status=SessionStatus.READY,
+        session_kind=SessionKind(config.session_kind),
+        include_in_trends=SessionKind(config.session_kind) == SessionKind.STANDARD,
     )
     session.add(interview)
     await session.flush()
+    await link_task_to_session(
+        session,
+        profile_id=profile_id,
+        task_id=config.practice_task_id,
+        interview_id=interview.id,
+    )
     session.add(
         InterviewContextState(
             session_id=interview.id,
@@ -246,6 +265,29 @@ async def create_session(
             },
         )
     )
+    await session.commit()
+    await session.refresh(interview)
+    return interview
+
+
+async def update_trend_inclusion(
+    session: AsyncSession,
+    interview: InterviewSession,
+    *,
+    include_in_trends: bool,
+) -> InterviewSession:
+    """Apply the user's explicit trend choice without re-running evaluation."""
+
+    if interview.include_in_trends == include_in_trends:
+        return interview
+    interview.include_in_trends = include_in_trends
+    interview.touch()
+
+    # Raw evaluation stays immutable; only the current report's derived trend
+    # comparison needs to be refreshed after a user changes participation.
+    from app.services.evaluation import refresh_report_trend_comparison
+
+    await refresh_report_trend_comparison(session, interview)
     await session.commit()
     await session.refresh(interview)
     return interview

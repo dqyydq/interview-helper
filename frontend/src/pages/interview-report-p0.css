@@ -1,0 +1,364 @@
+/* P0 report-to-practice loop. This layer is local to report surfaces. */
+.report-index .p0-practice-queue,
+.interview-report .p0-trend-inclusion,
+.interview-report .p0-training-outcome,
+.interview-report .p0-style-profile-boundary {
+  margin: var(--ih-space-4) var(--ih-space-5) 0;
+  color: var(--ih-color-ink);
+  border: 1px solid var(--ih-color-border);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-surface);
+  box-shadow: var(--ih-shadow-card);
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.report-index .p0-practice-queue {
+  overflow: hidden;
+}
+
+.p0-practice-queue > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ih-space-3);
+  padding: var(--ih-space-3);
+  border-bottom: 1px solid var(--ih-color-border);
+}
+
+.p0-practice-queue > header span:first-child {
+  display: block;
+  color: var(--ih-color-muted);
+  font-size: var(--ih-text-body);
+}
+
+.p0-practice-queue h2,
+.p0-training-outcome h2,
+.p0-trend-inclusion h2,
+.p0-style-profile-boundary h2 {
+  margin: 0;
+  color: var(--ih-color-ink);
+  font-size: var(--ih-text-h2);
+  font-weight: 700;
+  line-height: var(--ih-leading);
+}
+
+.p0-queue-count {
+  display: inline-grid;
+  min-width: var(--ih-control-height);
+  min-height: var(--ih-control-height);
+  place-items: center;
+  color: var(--ih-color-accent);
+  border: 1px solid var(--ih-color-accent);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-accent-surface);
+  font-size: var(--ih-text-body);
+  font-weight: 700;
+}
+
+.p0-practice-queue-list {
+  display: grid;
+}
+
+.p0-practice-queue-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ih-space-3);
+  padding: var(--ih-space-3);
+  border-top: 1px solid var(--ih-color-border);
+}
+
+.p0-practice-queue-list article:first-child {
+  border-top: 0;
+}
+
+.p0-practice-queue-list h3 {
+  margin: var(--ih-space-1) 0 0;
+  color: var(--ih-color-ink);
+  font-size: var(--ih-text-body);
+  font-weight: 700;
+  line-height: var(--ih-leading);
+}
+
+.p0-practice-queue-list p {
+  margin: var(--ih-space-1) 0 0;
+  color: var(--ih-color-muted);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.p0-practice-queue-list a,
+.p0-trend-inclusion button,
+.p0-training-outcome button,
+.p0-practice-confirmation button {
+  display: inline-flex;
+  min-height: var(--ih-control-height);
+  align-items: center;
+  justify-content: center;
+  gap: var(--ih-space-2);
+  padding: 0 var(--ih-space-3);
+  color: var(--ih-color-accent-foreground);
+  border: 1px solid var(--ih-color-accent);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-accent);
+  cursor: pointer;
+  font-family: var(--ih-font-sans);
+  font-size: var(--ih-text-body);
+  font-weight: 700;
+  line-height: var(--ih-leading);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.p0-practice-queue-list a:hover,
+.p0-trend-inclusion button:hover,
+.p0-training-outcome button:hover,
+.p0-practice-confirmation button:hover {
+  opacity: 0.9;
+}
+
+.p0-task-status {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 0 var(--ih-space-2);
+  color: var(--ih-color-accent);
+  border: 1px solid var(--ih-color-accent);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-accent-surface);
+  font-size: var(--ih-text-body);
+  font-weight: 600;
+  line-height: var(--ih-leading);
+}
+
+.p0-task-status.completed,
+.p0-task-status.dismissed {
+  color: var(--ih-color-muted);
+  border-color: var(--ih-color-border);
+  background: var(--ih-color-surface);
+}
+
+.interview-report .p0-trend-inclusion,
+.interview-report .p0-training-outcome {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ih-space-3);
+  padding: var(--ih-space-3);
+  background: var(--ih-color-accent-surface);
+}
+
+.interview-report .p0-trend-inclusion > svg,
+.interview-report .p0-training-outcome > svg {
+  color: var(--ih-color-accent);
+}
+
+.interview-report .p0-style-profile-boundary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--ih-space-3);
+  padding: var(--ih-space-3);
+  background: var(--ih-color-accent-surface);
+}
+
+.interview-report .p0-style-profile-boundary > svg {
+  margin-top: 2px;
+  color: var(--ih-color-accent);
+}
+
+.p0-style-profile-boundary.missing {
+  background: var(--ih-color-surface);
+}
+
+.p0-style-profile-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ih-space-2);
+}
+
+.p0-style-profile-heading span {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 0 var(--ih-space-2);
+  color: var(--ih-color-accent);
+  border: 1px solid var(--ih-color-accent);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-surface);
+  font-size: var(--ih-text-body);
+  font-weight: 700;
+  line-height: var(--ih-leading);
+}
+
+.p0-style-profile-boundary p,
+.p0-style-profile-boundary small {
+  display: block;
+  margin: var(--ih-space-1) 0 0;
+  color: var(--ih-color-muted);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.p0-trend-inclusion p,
+.p0-training-outcome p {
+  margin: var(--ih-space-1) 0 0;
+  color: var(--ih-color-muted);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.interview-report .p0-trend-inclusion.included {
+  display: flex;
+  color: var(--ih-color-muted);
+  background: var(--ih-color-surface);
+}
+
+.interview-report .p0-trend-inclusion.included p {
+  margin: 0;
+}
+
+.p0-training-outcome > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ih-space-2);
+}
+
+.p0-training-outcome > div:last-child button:first-child {
+  color: var(--ih-color-accent);
+  background: var(--ih-color-surface);
+}
+
+.p0-training-outcome.completed {
+  display: flex;
+}
+
+.p0-training-outcome.completed p {
+  margin: 0;
+}
+
+.interview-report .practice-plan > header > div > p {
+  margin: var(--ih-space-1) 0 0;
+  color: var(--ih-color-muted);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.interview-report .practice-plan ol > li {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--ih-space-3);
+}
+
+.interview-report .practice-plan .p0-action-already-queued {
+  background: var(--ih-color-accent-surface);
+}
+
+.p0-action-select {
+  display: inline-flex;
+  min-height: var(--ih-control-height);
+  align-items: center;
+  gap: var(--ih-space-2);
+  padding: 0 var(--ih-space-2);
+  color: var(--ih-color-ink);
+  border: 1px solid var(--ih-color-border);
+  border-radius: var(--ih-radius);
+  background: var(--ih-color-surface);
+  cursor: pointer;
+  font-size: var(--ih-text-body);
+  font-weight: 600;
+  line-height: var(--ih-leading);
+  white-space: nowrap;
+}
+
+.p0-action-select input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--ih-color-accent);
+}
+
+.p0-practice-confirmation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ih-space-3);
+  margin-top: var(--ih-space-3);
+  padding-top: var(--ih-space-3);
+  border-top: 1px solid var(--ih-color-border);
+}
+
+.p0-practice-confirmation p,
+.p0-practice-error {
+  margin: 0;
+  color: var(--ih-color-muted);
+  font-size: var(--ih-text-body);
+  line-height: var(--ih-leading);
+}
+
+.p0-practice-confirmation button:disabled,
+.p0-training-outcome button:disabled,
+.p0-trend-inclusion button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.p0-practice-error {
+  margin-top: var(--ih-space-2);
+}
+
+.report-index .p0-practice-queue :is(a, button):focus-visible,
+.interview-report :is(.p0-trend-inclusion button, .p0-training-outcome button, .p0-practice-confirmation button, .p0-action-select):focus-visible {
+  outline: 2px solid var(--ih-color-focus);
+  outline-offset: var(--ih-space-1);
+}
+
+@media (max-width: 720px) {
+  .report-index .p0-practice-queue,
+  .interview-report .p0-trend-inclusion,
+  .interview-report .p0-training-outcome,
+  .interview-report .p0-style-profile-boundary {
+    margin-right: var(--ih-space-4);
+    margin-left: var(--ih-space-4);
+  }
+
+  .p0-practice-queue-list article,
+  .interview-report .p0-trend-inclusion,
+  .interview-report .p0-training-outcome,
+  .p0-practice-confirmation,
+  .interview-report .p0-style-profile-boundary {
+    grid-template-columns: 1fr;
+  }
+
+  .p0-practice-queue-list a,
+  .p0-trend-inclusion button,
+  .p0-training-outcome > div:last-child,
+  .p0-practice-confirmation button {
+    width: 100%;
+  }
+
+  .p0-training-outcome > div:last-child button {
+    flex: 1 1 0;
+  }
+
+  .interview-report .practice-plan ol > li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .interview-report .practice-plan ol > li > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .p0-practice-queue-list a,
+  .p0-trend-inclusion button,
+  .p0-training-outcome button,
+  .p0-practice-confirmation button {
+    transition-duration: 50ms;
+  }
+}

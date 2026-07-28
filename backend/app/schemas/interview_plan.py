@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import Field, model_validator
 
-from app.db.models.common import JobStatus, PlanStatus, SourceType
+from app.db.models.common import JobStatus, PlanStatus, SessionKind, SourceType
 from app.schemas.common import ApiModel, EntityPublic
 
 
@@ -11,6 +11,8 @@ class InterviewPlanCreate(ApiModel):
     company_id: uuid.UUID
     round_profile_id: uuid.UUID
     role_name: str = Field(default="llm_application_engineer", min_length=1, max_length=160)
+    session_kind: SessionKind = SessionKind.STANDARD
+    practice_task_id: uuid.UUID | None = None
     duration_minutes: int = Field(default=45, ge=10, le=240)
     target_question_count: int = Field(default=6, ge=1, le=20)
     question_bank_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
@@ -34,6 +36,14 @@ class InterviewPlanCreate(ApiModel):
             raise ValueError("source weights must be between 0 and 1")
         if sum(self.source_weights.values()) <= 0:
             raise ValueError("at least one source weight must be positive")
+        if self.practice_task_id and self.session_kind != SessionKind.TARGETED_PRACTICE:
+            raise ValueError("practice_task_id requires targeted_practice session_kind")
+        if self.session_kind == SessionKind.QUICK_TRIAL:
+            # A trial is a product preset rather than a second configurable
+            # interview mode.  Keeping it deterministic makes its readiness and
+            # trend semantics clear across API clients.
+            self.duration_minutes = 10
+            self.target_question_count = 2
         return self
 
 
@@ -65,6 +75,8 @@ class InterviewConfigPublic(EntityPublic):
     round_profile_id: uuid.UUID
     resume_id: uuid.UUID | None
     role_name: str
+    session_kind: SessionKind
+    practice_task_id: uuid.UUID | None
     duration_minutes: int
     target_question_count: int
     question_bank_ids: list

@@ -57,6 +57,28 @@ class SessionStatus(StrEnum):
     FAILED = "failed"
 
 
+class SessionKind(StrEnum):
+    """The intentional use of an interview session.
+
+    Session kind is separate from the realtime lifecycle status.  It lets short
+    confidence-building trials and report-derived practice sessions stay useful
+    without silently changing a user's long-term trend history.
+    """
+
+    STANDARD = "standard"
+    QUICK_TRIAL = "quick_trial"
+    TARGETED_PRACTICE = "targeted_practice"
+
+
+class PracticeTaskStatus(StrEnum):
+    """User-controlled lifecycle for a report-derived practice task."""
+
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    DISMISSED = "dismissed"
+
+
 class JobStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"

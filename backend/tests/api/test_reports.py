@@ -46,6 +46,7 @@ from app.providers.types import (
 from app.schemas.evaluation import CoachResponse
 from app.services.evaluation import evaluate_interview
 from app.workers import evaluation_jobs
+from app.workers.plan_jobs import run_once as run_plan_once
 
 
 class ReportProvider(ChatProvider):
@@ -142,7 +143,21 @@ async def _seed_finished_interview():
             status=PlanStatus.FROZEN,
             total_minutes=45,
             frozen_at=utc_now(),
-            plan_snapshot={"style_pack_version": 3},
+            plan_snapshot={
+                "style_pack_version": 3,
+                "style_pack_trust": {
+                    "trust_status": "source_backed",
+                    "evidence_count": 2,
+                    "latest_evidence_at": "2026-07-18T10:00:00+00:00",
+                    "source_summaries": [
+                        {
+                            "title": "公开面试经验摘要",
+                            "url": "https://example.test/interview-summary",
+                            "excerpt": "聚焦系统设计与技术追问。",
+                        }
+                    ],
+                },
+            },
         )
         session.add(plan)
         await session.flush()
@@ -286,6 +301,20 @@ async def test_evaluation_persists_only_raw_answer_evidence_and_report_api(
     body = response.json()
     assert body["status"] == EvaluationStatus.COMPLETED
     assert body["trend_comparison"] == {}
+    assert body["style_profile"] == {
+        "snapshot_available": True,
+        "trust_status": "source_backed",
+        "version": 3,
+        "evidence_count": 2,
+        "latest_evidence_at": "2026-07-18T10:00:00+00:00",
+        "source_summaries": [
+            {
+                "title": "公开面试经验摘要",
+                "url": "https://example.test/interview-summary",
+                "excerpt": "聚焦系统设计与技术追问。",
+            }
+        ],
+    }
     assert len(body["questions"]) == 2
     assert len(body["dimensions"]) == 4
     assert {item["id"] for item in body["evidence_messages"]} == {str(item.id) for item in answers}
@@ -299,6 +328,112 @@ async def test_evaluation_persists_only_raw_answer_evidence_and_report_api(
     assert listing.status_code == 200
     assert listing.json()[0]["company_name"] == "证据公司"
     assert listing.json()[0]["round_name"] == "二面"
+
+
+@pytest.mark.asyncio
+async def test_report_actions_are_confirmed_idempotent_tasks_with_user_controlled_trends(
+    client: AsyncClient,
+) -> None:
+    _, interview, questions, answers = await _seed_finished_interview()
+    provider = ReportProvider(_response(questions, answers))
+    async with async_session_factory() as session:
+        interview_row = await session.get(InterviewSession, interview.id)
+        assert interview_row is not None
+        report = await evaluate_interview(session, interview_row, provider=provider)
+        report_id = report.id
+
+    created = await client.post(
+        f"/api/reports/{report_id}/practice-tasks",
+        json={"action_indices": [0]},
+    )
+    repeated = await client.post(
+        f"/api/reports/{report_id}/practice-tasks",
+        json={"action_indices": [0]},
+    )
+    assert created.status_code == 200
+    assert repeated.status_code == 200
+    first_task = created.json()[0]
+    assert repeated.json()[0]["id"] == first_task["id"]
+    assert first_task["report_id"] == str(report_id)
+    assert first_task["action_index"] == 0
+    assert first_task["status"] == "pending"
+
+    async with async_session_factory() as session:
+        source_plan = await session.get(InterviewPlan, interview.plan_id)
+        assert source_plan is not None
+        source_config = await session.get(InterviewConfig, source_plan.config_id)
+        assert source_config is not None
+        company_id = source_config.company_id
+        round_profile_id = source_config.round_profile_id
+        role_name = source_config.role_name
+
+    targeted_plan = await client.post(
+        "/api/interview-plans",
+        json={
+            "company_id": str(company_id),
+            "round_profile_id": str(round_profile_id),
+            "role_name": role_name,
+            "duration_minutes": 10,
+            "target_question_count": 2,
+            "session_kind": "targeted_practice",
+            "practice_task_id": first_task["id"],
+        },
+    )
+    assert targeted_plan.status_code == 202
+    assert targeted_plan.json()["plan"]["config"]["practice_task_id"] == first_task["id"]
+    practice_focus = targeted_plan.json()["plan"]["plan_snapshot"]["practice_focus"]
+    assert practice_focus["task_id"] == first_task["id"]
+    assert await run_plan_once("report-practice-planner") is True
+    practice_session = await client.post(
+        "/api/interview-sessions",
+        json={"plan_id": targeted_plan.json()["plan"]["id"]},
+    )
+    assert practice_session.status_code == 201
+    assert practice_session.json()["session_kind"] == "targeted_practice"
+    assert practice_session.json()["include_in_trends"] is False
+
+    linked_task = await client.get(f"/api/practice-tasks/{first_task['id']}")
+    assert linked_task.json()["status"] == "in_progress"
+    assert linked_task.json()["last_session_id"] == practice_session.json()["id"]
+
+    queued = await client.get("/api/practice-tasks?status=pending")
+    assert queued.status_code == 200
+    assert queued.json() == []
+
+    in_progress = await client.patch(
+        f"/api/practice-tasks/{first_task['id']}",
+        json={"status": "in_progress"},
+    )
+    kept = await client.patch(
+        f"/api/practice-tasks/{first_task['id']}",
+        json={"status": "pending"},
+    )
+    completed = await client.patch(
+        f"/api/practice-tasks/{first_task['id']}",
+        json={"status": "completed"},
+    )
+    assert in_progress.json()["status"] == "in_progress"
+    assert kept.json()["status"] == "pending"
+    assert completed.json()["status"] == "completed"
+    assert completed.json()["completed_at"] is not None
+
+    excluded = await client.patch(
+        f"/api/interview-sessions/{interview.id}/trend-inclusion",
+        json={"include_in_trends": False},
+    )
+    assert excluded.status_code == 200
+    assert excluded.json()["include_in_trends"] is False
+    excluded_report = await client.get(f"/api/reports/{report_id}")
+    assert excluded_report.json()["trend_comparison"]["included_in_trends"] is False
+
+    included = await client.patch(
+        f"/api/interview-sessions/{interview.id}/trend-inclusion",
+        json={"include_in_trends": True},
+    )
+    assert included.status_code == 200
+    assert included.json()["include_in_trends"] is True
+    included_report = await client.get(f"/api/reports/{report_id}")
+    assert included_report.json()["trend_comparison"] == {}
 
 
 @pytest.mark.asyncio

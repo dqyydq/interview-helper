@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import AnyHttpUrl, Field
 
@@ -106,6 +107,11 @@ class CompanyStylePackPublic(EntityPublic):
     visibility: Visibility
     evidence_count: int
     evidence_label: str
+    # These are additive trust signals.  They describe the provenance of the
+    # current style pack without changing the older label used by existing
+    # company-management screens.
+    trust_status: Literal["template", "draft", "source_backed"]
+    latest_evidence_at: datetime | None
     rounds: list[RoundProfilePublic]
     evidence: list[EvidenceItemPublic]
 

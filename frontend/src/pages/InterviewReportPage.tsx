@@ -24,7 +24,9 @@ import type {
   EvaluationReport,
   EvaluationJob,
   EvidenceReference,
+  PracticeTask,
 } from "../features/reports/types";
+import "./interview-report-p0.css";
 
 const anchorLabels: Record<EvaluationAnchor, string> = {
   evidence_insufficient: "证据不足",
@@ -47,6 +49,19 @@ const reportStatusLabels: Record<EvaluationReport["status"], string> = {
   failed: "需要重试",
   completed: "已完成",
 };
+
+const practiceStatusLabels: Record<PracticeTask["status"], string> = {
+  pending: "待练",
+  in_progress: "练习中",
+  completed: "已完成",
+  dismissed: "已忽略",
+};
+
+const styleProfileTrustLabels = {
+  template: "轮次骨架",
+  draft: "自定义草案",
+  source_backed: "有来源支持",
+} as const;
 
 function phaseLabel(job: EvaluationJob | null) {
   const phase = String(job?.result.phase ?? "queued");
@@ -72,6 +87,12 @@ export function InterviewReportPage() {
     queryFn: () => reportApi.get(reportId!),
     enabled: Boolean(reportId),
   });
+  const practiceTasks = useQuery({
+    queryKey: ["practice-tasks"],
+    queryFn: () => reportApi.listPracticeTasks(),
+    enabled: !reportId && typeof reportApi.listPracticeTasks === "function",
+    retry: false,
+  });
   const retry = useMutation({
     mutationFn: () => reportApi.retry(reportId!),
     onSuccess: async () => {
@@ -95,7 +116,15 @@ export function InterviewReportPage() {
   }, [evaluationJobId, evaluationJobStatus, queryClient, reportId]);
 
   if (!reportId) {
-    return <ReportIndex isLoading={list.isLoading} isError={list.isError} reports={list.data ?? []} />;
+    return (
+      <ReportIndex
+        isLoading={list.isLoading}
+        isError={list.isError}
+        reports={list.data ?? []}
+        practiceTasks={practiceTasks.data ?? []}
+        practiceTasksLoading={practiceTasks.isLoading}
+      />
+    );
   }
   if (report.isLoading) return <ReportSkeleton />;
   if (report.isError || !report.data) {
@@ -125,11 +154,16 @@ function ReportIndex({
   isLoading,
   isError,
   reports,
+  practiceTasks,
+  practiceTasksLoading,
 }: {
   isLoading: boolean;
   isError: boolean;
   reports: Awaited<ReturnType<typeof reportApi.list>>;
+  practiceTasks: PracticeTask[];
+  practiceTasksLoading: boolean;
 }) {
+  const activeTasks = practiceTasks.filter((task) => task.status === "pending" || task.status === "in_progress");
   return (
     <section className="report-index" aria-labelledby="report-index-title">
       <header>
@@ -149,6 +183,29 @@ function ReportIndex({
         </div>
       )}
       {isError && <p className="report-index-error" role="alert">报告列表暂时无法读取，请确认本地服务已启动后重试。</p>}
+      {!practiceTasksLoading && activeTasks.length > 0 && (
+        <section className="p0-practice-queue" aria-labelledby="practice-queue-title">
+          <header>
+            <div>
+              <span>个人训练队列</span>
+              <h2 id="practice-queue-title">待练任务</h2>
+            </div>
+            <span className="p0-queue-count">{activeTasks.length}</span>
+          </header>
+          <div className="p0-practice-queue-list">
+            {activeTasks.slice(0, 4).map((task) => (
+              <article key={task.id}>
+                <div>
+                  <span className={`p0-task-status ${task.status}`}>{practiceStatusLabels[task.status]}</span>
+                  <h3>{task.title}</h3>
+                  <p>{task.success_criteria}</p>
+                </div>
+                <Link to={`/interviews/setup?task=${encodeURIComponent(task.id)}`}>开始 10 分钟专项 <ArrowRight size={15} /></Link>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
       {!isLoading && !isError && reports.length === 0 && (
         <EmptyState
           className="report-index-empty"
@@ -229,11 +286,44 @@ function ReportProgress({
 
 function CompletedReport({ report }: { report: EvaluationReport }) {
   const [selectedEvidence, setSelectedEvidence] = useState<EvidenceReference | null>(null);
+  const [selectedActionIndices, setSelectedActionIndices] = useState<number[]>([]);
+  const queryClient = useQueryClient();
+  const practiceTasks = useQuery({
+    queryKey: ["practice-tasks"],
+    queryFn: () => reportApi.listPracticeTasks(),
+    enabled: typeof reportApi.listPracticeTasks === "function",
+    retry: false,
+  });
+  const reportTasks = (practiceTasks.data ?? []).filter((task) => task.report_id === report.id);
+  const createPracticeTasks = useMutation({
+    mutationFn: () => reportApi.createPracticeTasks(report.id, selectedActionIndices),
+    onSuccess: async () => {
+      setSelectedActionIndices([]);
+      await queryClient.invalidateQueries({ queryKey: ["practice-tasks"] });
+    },
+  });
+  const includeInTrends = useMutation({
+    mutationFn: () => reportApi.updateTrendInclusion(report.session_id, true),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["report", report.id] });
+      await queryClient.invalidateQueries({ queryKey: ["reports"] });
+    },
+  });
   const messagesById = useMemo(
     () => new Map(report.evidence_messages.map((message) => [message.id, message])),
     [report.evidence_messages],
   );
   const trendVisible = (report.trend_comparison.comparable_session_count ?? 0) >= 2;
+  const isShortSession = report.session_kind === "quick_trial" || report.session_kind === "targeted_practice";
+  const sessionTask = reportTasks.find((task) => task.last_session_id === report.session_id);
+
+  const toggleAction = (actionIndex: number) => {
+    setSelectedActionIndices((current) => (
+      current.includes(actionIndex)
+        ? current.filter((item) => item !== actionIndex)
+        : [...current, actionIndex]
+    ));
+  };
 
   return (
     <article className="interview-report" aria-labelledby="report-title">
@@ -250,6 +340,34 @@ function CompletedReport({ report }: { report: EvaluationReport }) {
           <span>{report.questions.length} 道题 · {report.evidence_messages.length} 条原始证据</span>
         </div>
       </header>
+
+      {isShortSession && report.include_in_trends === false && (
+        <section className="p0-trend-inclusion" aria-labelledby="trend-inclusion-title">
+          <Target size={18} aria-hidden="true" />
+          <div>
+            <h2 id="trend-inclusion-title">这是一场{report.session_kind === "quick_trial" ? "试跑" : "专项训练"}</h2>
+            <p>默认不计入长期趋势，避免短场练习放大或扭曲你的正式成长记录。</p>
+          </div>
+          <button
+            type="button"
+            disabled={includeInTrends.isPending}
+            onClick={() => includeInTrends.mutate()}
+          >
+            {includeInTrends.isPending ? "正在纳入" : "纳入正式趋势"}
+          </button>
+        </section>
+      )}
+
+      {isShortSession && report.include_in_trends === true && (
+        <section className="p0-trend-inclusion included" aria-label="趋势记录状态">
+          <CheckCircle2 size={18} aria-hidden="true" />
+          <p>已由你手动纳入正式趋势。</p>
+        </section>
+      )}
+
+      {sessionTask && <TrainingTaskOutcome task={sessionTask} />}
+
+      <StyleProfileBoundary styleProfile={report.style_profile} />
 
       <div className="report-layout">
         <aside className="report-outline" aria-label="报告目录">
@@ -315,20 +433,55 @@ function CompletedReport({ report }: { report: EvaluationReport }) {
           <section id="practice-plan" className="practice-plan">
             <header>
               <ListChecks size={19} />
-              <div><span>专项练习</span><h2>专项练习计划</h2></div>
+              <div>
+                <span>专项练习</span>
+                <h2>专项练习计划</h2>
+                <p>先选择你愿意加入的建议；确认后才会写入你的私人训练队列。</p>
+              </div>
             </header>
             <ol>
-              {report.action_plan.map((action) => (
-                <li key={action.title}>
+              {report.action_plan.map((action, actionIndex) => {
+                const queuedTask = reportTasks.find((task) => task.action_index === actionIndex && task.status !== "dismissed");
+                const selected = selectedActionIndices.includes(actionIndex);
+                return (
+                <li className={queuedTask ? "p0-action-already-queued" : ""} key={action.title}>
                   <span>P{action.priority}</span>
                   <div>
                     <h3>{action.title}</h3>
                     <p>{action.instruction}</p>
                     <small>完成标准：{action.success_criteria}</small>
                   </div>
+                  {queuedTask ? (
+                    <span className={`p0-task-status ${queuedTask.status}`}>{practiceStatusLabels[queuedTask.status]}</span>
+                  ) : (
+                    <label className="p0-action-select">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleAction(actionIndex)}
+                      />
+                      <span>加入队列</span>
+                    </label>
+                  )}
                 </li>
-              ))}
+                );
+              })}
             </ol>
+            {report.action_plan.length > 0 && (
+              <footer className="p0-practice-confirmation">
+                <p>加入后会以 10 分钟专项模拟承接训练目标，不会自动写入长期记忆。</p>
+                <button
+                  type="button"
+                  disabled={selectedActionIndices.length === 0 || createPracticeTasks.isPending}
+                  onClick={() => createPracticeTasks.mutate()}
+                >
+                  {createPracticeTasks.isPending ? "正在加入" : `加入训练队列${selectedActionIndices.length ? `（${selectedActionIndices.length}）` : ""}`}
+                </button>
+              </footer>
+            )}
+            {createPracticeTasks.isError && (
+              <p className="p0-practice-error" role="alert">暂时无法加入训练队列，请确认本地服务已更新后重试。</p>
+            )}
           </section>
         </main>
 
@@ -364,6 +517,82 @@ function CompletedReport({ report }: { report: EvaluationReport }) {
         onClose={() => setSelectedEvidence(null)}
       />
     </article>
+  );
+}
+
+function StyleProfileBoundary({
+  styleProfile,
+}: {
+  styleProfile: EvaluationReport["style_profile"];
+}) {
+  const profile = styleProfile ?? {
+    snapshot_available: false,
+    trust_status: "template" as const,
+    version: null,
+    evidence_count: 0,
+    latest_evidence_at: null,
+    source_summaries: [],
+  };
+  const trustLabel = styleProfileTrustLabels[profile.trust_status];
+
+  return (
+    <section
+      className={`p0-style-profile-boundary ${profile.snapshot_available ? "" : "missing"}`}
+      aria-labelledby="style-profile-boundary-title"
+    >
+      <ShieldCheck size={18} aria-hidden="true" />
+      <div>
+        <div className="p0-style-profile-heading">
+          <h2 id="style-profile-boundary-title">本场公司画像边界</h2>
+          <span>{trustLabel}</span>
+        </div>
+        {profile.snapshot_available ? (
+          <p>
+            {profile.version ? `风格包 v${profile.version}` : "风格包版本未记录"}
+            {` · ${profile.evidence_count} 条证据`}
+            {profile.source_summaries.length > 0
+              ? ` · 已冻结 ${profile.source_summaries.length} 条来源摘要`
+              : ""}
+          </p>
+        ) : (
+          <p>这份报告创建于画像快照启用前，无法还原本场的版本与证据。</p>
+        )}
+        <small>画像仅用于模拟提问节奏与追问范围，不代表公司官方面试标准、招聘事实或录用判断。</small>
+      </div>
+    </section>
+  );
+}
+
+function TrainingTaskOutcome({ task }: { task: PracticeTask }) {
+  const queryClient = useQueryClient();
+  const updateTask = useMutation({
+    mutationFn: (status: PracticeTask["status"]) => reportApi.updatePracticeTask(task.id, status),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["practice-tasks"] });
+    },
+  });
+
+  if (task.status === "completed") {
+    return (
+      <section className="p0-training-outcome completed" aria-label="训练任务已完成">
+        <CheckCircle2 size={18} aria-hidden="true" />
+        <p>此专项训练已标记完成；它仍只会保留为你的私有训练记录。</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="p0-training-outcome" aria-labelledby="training-outcome-title">
+      <ListChecks size={18} aria-hidden="true" />
+      <div>
+        <h2 id="training-outcome-title">完成这次专项后，要如何处理任务？</h2>
+        <p>{task.title} · {task.success_criteria}</p>
+      </div>
+      <div>
+        <button type="button" disabled={updateTask.isPending} onClick={() => updateTask.mutate("pending")}>保留待练</button>
+        <button type="button" disabled={updateTask.isPending} onClick={() => updateTask.mutate("completed")}>标记完成</button>
+      </div>
+    </section>
   );
 }
 

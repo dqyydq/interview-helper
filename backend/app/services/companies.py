@@ -147,10 +147,13 @@ async def style_pack_public(
     rounds = await _rounds(session, style_pack.id)
     evidence = await _evidence(session, style_pack.id)
     if evidence:
+        trust_status = "source_backed"
         evidence_label = "有来源支持"
     elif style_pack.status == ContentStatus.DRAFT:
+        trust_status = "draft"
         evidence_label = "自定义草案 · 未提供来源"
     else:
+        trust_status = "template"
         evidence_label = "轮次骨架 · 非风格结论"
     return CompanyStylePackPublic(
         id=style_pack.id,
@@ -166,6 +169,8 @@ async def style_pack_public(
         visibility=style_pack.visibility,
         evidence_count=len(evidence),
         evidence_label=evidence_label,
+        trust_status=trust_status,
+        latest_evidence_at=max((item.fetched_at for item in evidence), default=None),
         rounds=[_round_public(item) for item in rounds],
         evidence=[_evidence_public(item) for item in evidence],
     )

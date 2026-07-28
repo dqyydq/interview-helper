@@ -7,12 +7,14 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 
 from app.api.errors import AppError
+from app.context.segmentation import close_current_segment
 from app.context.snapshot import finalize_context_snapshot
 from app.core.config import settings
 from app.core.security import InFlightAnswerRegistry, SlidingWindowRateLimiter
 from app.db.models.common import MessageRole, SessionStatus, utc_now
 from app.db.models.interview import InterviewPlan, InterviewSession
 from app.db.session import async_session_factory
+from app.providers.base import ProviderError
 from app.providers.types import StreamEventType, Usage
 from app.realtime.connection_manager import connection_manager
 from app.realtime.event_store import append_event, find_client_event, replay_events
@@ -20,6 +22,8 @@ from app.realtime.events import ClientEvent, ServerEvent
 from app.schemas.attachments import AnswerCommitPayload
 from app.services import interview_sessions
 from app.services.interview_orchestrator import (
+    decide_turn,
+    pending_answer_for_retry,
     prepare_turn,
     save_assistant_message,
     save_restatement,
@@ -66,6 +70,28 @@ async def _transient(websocket: WebSocket, session_id: uuid.UUID, text: str) -> 
             sequence=0,
             timestamp=utc_now(),
             payload={"text": text},
+            transient=True,
+        ),
+    )
+
+
+async def _turn_status(
+    websocket: WebSocket,
+    session_id: uuid.UUID,
+    stage: str,
+    message: str,
+) -> None:
+    """Tell the client what durable/recoverable work is happening next."""
+
+    await _send(
+        websocket,
+        ServerEvent(
+            event_id=uuid.uuid4(),
+            session_id=session_id,
+            type="turn.status",
+            sequence=0,
+            timestamp=utc_now(),
+            payload={"stage": stage, "message": message},
             transient=True,
         ),
     )
@@ -120,6 +146,148 @@ async def _send_timer(
     )
 
 
+async def _generate_turn_from_saved_answer(
+    websocket: WebSocket,
+    session,
+    interview: InterviewSession,
+    answer,
+    *,
+    retry_client_event_id: str | None = None,
+) -> None:
+    """Turn an already-persisted answer into one next interviewer message.
+
+    A retry starts here, never at answer submission.  That makes the durable
+    user message the single source of truth while allowing provider failures to
+    be retried without duplicate transcript rows.
+    """
+
+    try:
+        await _turn_status(websocket, interview.id, "choosing_follow_up", "正在判断下一步节奏")
+        decision_result = await decide_turn(session, interview, answer)
+        stage = decision_result.decision.action
+        if stage == "advance":
+            await _turn_status(websocket, interview.id, "advancing", "正在切换到下一道主问题")
+        elif stage == "finish":
+            await _turn_status(websocket, interview.id, "advancing", "正在收束本场面试")
+        await _turn_status(websocket, interview.id, "generating_question", "正在生成下一步问题")
+        turn = await prepare_turn(
+            session,
+            interview,
+            decision=decision_result.decision,
+            decision_source=decision_result.source,
+        )
+        content = ""
+        usage: Usage | None = None
+        if turn.static_prompt:
+            content = turn.static_prompt
+            await _transient(websocket, interview.id, content)
+        else:
+            assert turn.provider and turn.request
+            try:
+                try:
+                    async with asyncio.timeout(PROVIDER_STREAM_TIMEOUT_SECONDS):
+                        async for chunk in turn.provider.stream_chat(turn.request):
+                            if chunk.type == StreamEventType.TEXT_DELTA and chunk.text:
+                                content += chunk.text
+                                await _transient(websocket, interview.id, chunk.text)
+                            elif chunk.type == StreamEventType.USAGE and chunk.usage:
+                                usage = chunk.usage
+                            elif chunk.type == StreamEventType.FAILED:
+                                raise AppError(
+                                    code=chunk.error_code or "provider_failed",
+                                    message="面试官模型暂时无法回答",
+                                    status_code=503,
+                                    retryable=chunk.retryable,
+                                )
+                except TimeoutError as exc:
+                    raise AppError(
+                        code="provider_timeout",
+                        message="面试官模型响应超时，可以重试当前回答",
+                        status_code=504,
+                        retryable=True,
+                    ) from exc
+            finally:
+                close = getattr(turn.provider, "aclose", None)
+                if close:
+                    await close()
+        if not content.strip():
+            raise AppError(
+                code="provider_empty_response",
+                message="面试官未返回内容，可以重试当前回答",
+                status_code=502,
+                retryable=True,
+            )
+        message = await save_assistant_message(session, interview, turn, content)
+        # Persist the closing message before sealing the segment so its evidence
+        # remains attached to the final question and the summary job can include it.
+        if turn.should_finish:
+            await close_current_segment(session, interview, turn.plan_question.id)
+        await finalize_context_snapshot(
+            session,
+            turn.context_snapshot_id,
+            usage if not turn.static_prompt else None,
+        )
+        final = await append_event(
+            session,
+            interview,
+            event_type="assistant.message",
+            payload={
+                "message": {
+                    "id": str(message.id),
+                    "role": _message_role_value(message.role),
+                    "content": message.content,
+                    "sequence": message.sequence,
+                }
+            },
+            # New-answer acknowledgements already use the client id. A retry
+            # has no acknowledgement, so it can use its id to become idempotent.
+            client_event_id=retry_client_event_id,
+        )
+        await _send(websocket, final)
+        await _send_timer(websocket, session, interview)
+        if turn.should_finish:
+            interview = await interview_sessions.finish_session(session, interview)
+            await _send(
+                websocket,
+                await append_event(
+                    session,
+                    interview,
+                    event_type="session.state",
+                    payload={"status": _status_value(interview.status)},
+                ),
+            )
+    except ProviderError as exc:
+        error = await append_event(
+            session,
+            interview,
+            event_type="error",
+            payload={"code": exc.code, "message": exc.message, "retryable": True},
+            client_event_id=retry_client_event_id,
+        )
+        await _send(websocket, error)
+    except AppError as exc:
+        error = await append_event(
+            session,
+            interview,
+            event_type="error",
+            payload={
+                "code": exc.code,
+                "message": exc.message,
+                "retryable": exc.retryable,
+            },
+            client_event_id=retry_client_event_id,
+        )
+        await _send(websocket, error)
+
+
+async def _pending_turn_available(session, interview: InterviewSession) -> bool:
+    try:
+        await pending_answer_for_retry(session, interview)
+    except AppError:
+        return False
+    return True
+
+
 @router.websocket("/interviews/{session_id}/live")
 async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
     client_host = websocket.client.host if websocket.client else "unknown"
@@ -145,7 +313,10 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                     session,
                     interview,
                     event_type="session.state",
-                    payload={"status": _status_value(interview.status)},
+                    payload={
+                        "status": _status_value(interview.status),
+                        "pending_turn": await _pending_turn_available(session, interview),
+                    },
                 ),
             )
             await _send_timer(websocket, session, interview)
@@ -204,7 +375,10 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                             session,
                             interview,
                             event_type="session.state",
-                            payload={"status": _status_value(interview.status)},
+                            payload={
+                                "status": _status_value(interview.status),
+                                "pending_turn": await _pending_turn_available(session, interview),
+                            },
                             client_event_id=str(incoming.event_id),
                         ),
                     )
@@ -270,6 +444,46 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                     )
                     await _send(websocket, event)
                     continue
+                if incoming.type == "turn.retry":
+                    if not await in_flight_answers.acquire(session_id):
+                        await _send_protocol_error(
+                            websocket,
+                            session_id,
+                            "answer_pending",
+                            "上一轮仍在处理中，请稍候再试",
+                        )
+                        continue
+                    try:
+                        answer = await pending_answer_for_retry(session, interview)
+                        await _turn_status(
+                            websocket,
+                            session_id,
+                            "retrying",
+                            "回答已保存，正在重新生成下一步",
+                        )
+                        await _generate_turn_from_saved_answer(
+                            websocket,
+                            session,
+                            interview,
+                            answer,
+                            retry_client_event_id=str(incoming.event_id),
+                        )
+                    except AppError as exc:
+                        error = await append_event(
+                            session,
+                            interview,
+                            event_type="error",
+                            payload={
+                                "code": exc.code,
+                                "message": exc.message,
+                                "retryable": exc.retryable,
+                            },
+                            client_event_id=str(incoming.event_id),
+                        )
+                        await _send(websocket, error)
+                    finally:
+                        await in_flight_answers.release(session_id)
+                    continue
                 if incoming.type not in {"user.text.submit", "user.answer.commit"}:
                     continue
                 if interview.status == SessionStatus.READY:
@@ -316,98 +530,23 @@ async def interview_live(websocket: WebSocket, session_id: uuid.UUID) -> None:
                         client_event_id=str(incoming.event_id),
                     )
                     await _send(websocket, ack)
+                    await _turn_status(
+                        websocket,
+                        session_id,
+                        "answer_saved",
+                        "回答已保存，正在准备下一步",
+                    )
+                    await _generate_turn_from_saved_answer(
+                        websocket,
+                        session,
+                        interview,
+                        answer,
+                    )
+                    await in_flight_answers.release(session_id)
+                    continue
                 except BaseException:
                     await in_flight_answers.release(session_id)
                     raise
-                try:
-                    turn = await prepare_turn(session, interview)
-                    content = ""
-                    usage: Usage | None = None
-                    if turn.static_prompt:
-                        content = turn.static_prompt
-                        await _transient(websocket, session_id, content)
-                    else:
-                        assert turn.provider and turn.request
-                        try:
-                            try:
-                                async with asyncio.timeout(PROVIDER_STREAM_TIMEOUT_SECONDS):
-                                    async for chunk in turn.provider.stream_chat(turn.request):
-                                        if chunk.type == StreamEventType.TEXT_DELTA and chunk.text:
-                                            content += chunk.text
-                                            await _transient(websocket, session_id, chunk.text)
-                                        elif chunk.type == StreamEventType.USAGE and chunk.usage:
-                                            usage = chunk.usage
-                                        elif chunk.type == StreamEventType.FAILED:
-                                            raise AppError(
-                                                code=chunk.error_code or "provider_failed",
-                                                message="面试官模型暂时无法回答",
-                                                status_code=503,
-                                                retryable=chunk.retryable,
-                                            )
-                            except TimeoutError as exc:
-                                raise AppError(
-                                    code="provider_timeout",
-                                    message="面试官模型响应超时，可以重试当前回答",
-                                    status_code=504,
-                                    retryable=True,
-                                ) from exc
-                        finally:
-                            close = getattr(turn.provider, "aclose", None)
-                            if close:
-                                await close()
-                    if not content.strip():
-                        raise AppError(
-                            code="provider_empty_response",
-                            message="面试官未返回内容",
-                            status_code=502,
-                        )
-                    message = await save_assistant_message(session, interview, turn, content)
-                    await finalize_context_snapshot(
-                        session,
-                        turn.context_snapshot_id,
-                        usage if not turn.static_prompt else None,
-                    )
-                    final = await append_event(
-                        session,
-                        interview,
-                        event_type="assistant.message",
-                        payload={
-                            "message": {
-                                "id": str(message.id),
-                                "role": _message_role_value(message.role),
-                                "content": message.content,
-                                "sequence": message.sequence,
-                            }
-                        },
-                    )
-                    await _send(websocket, final)
-                    await _send_timer(websocket, session, interview)
-                    if turn.should_finish:
-                        interview = await interview_sessions.finish_session(session, interview)
-                        await _send(
-                            websocket,
-                            await append_event(
-                                session,
-                                interview,
-                                event_type="session.state",
-                                payload={"status": _status_value(interview.status)},
-                            ),
-                        )
-                except AppError as exc:
-                    error = await append_event(
-                        session,
-                        interview,
-                        event_type="error",
-                        payload={
-                            "code": exc.code,
-                            "message": exc.message,
-                            "retryable": exc.retryable,
-                        },
-                    )
-                    await _send(websocket, error)
-                finally:
-                    # Keep the admission lock until the assistant turn is persisted or failed.
-                    await in_flight_answers.release(session_id)
     except WebSocketDisconnect:
         return
     except (AppError, ValueError):

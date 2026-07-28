@@ -8,7 +8,9 @@ from app.schemas.evaluation import (
     EvaluationReportPublic,
     ReportListItem,
 )
+from app.schemas.practice import PracticeTaskCreateFromReport, PracticeTaskPublic
 from app.services import evaluation as service
+from app.services import practice_tasks as practice_task_service
 from app.services.model_connections import ensure_local_profile
 
 router = APIRouter(tags=["reports"])
@@ -56,3 +58,23 @@ async def retry_report(
     report = await service.get_report(session, profile.id, report_id)
     job = await service.retry_evaluation(session, report)
     return EvaluationJobPublic.model_validate(job)
+
+
+@router.post(
+    "/reports/{report_id}/practice-tasks",
+    response_model=list[PracticeTaskPublic],
+    status_code=status.HTTP_200_OK,
+)
+async def create_report_practice_tasks(
+    report_id: uuid.UUID,
+    payload: PracticeTaskCreateFromReport,
+    session: SessionDep,
+) -> list[PracticeTaskPublic]:
+    profile = await ensure_local_profile(session)
+    tasks = await practice_task_service.create_tasks_from_report(
+        session,
+        profile.id,
+        report_id,
+        payload,
+    )
+    return [practice_task_service.task_public(task) for task in tasks]
