@@ -11,9 +11,6 @@
   --color-report-muted: oklch(52% 0.025 255);
   --color-report-rule: oklch(86% 0.013 255);
   --color-report-rule-strong: oklch(72% 0.02 255);
-  --color-report-accent: oklch(57% 0.21 257);
-  --color-report-accent-ink: oklch(99% 0.004 255);
-  --color-report-focus: oklch(48% 0.21 257);
   --color-report-positive: oklch(47% 0.11 158);
   --color-report-positive-paper: oklch(96% 0.025 158);
   --color-report-warning: oklch(51% 0.12 60);
@@ -21,6 +18,23 @@
   --color-report-danger: oklch(49% 0.16 28);
   --color-report-danger-paper: oklch(96% 0.03 28);
   --color-report-backdrop: oklch(16% 0.018 255 / 42%);
+
+  /* Product-wide accent + neutral palette. Every page (report subtree
+   * included) resolves to these literal values so the accent blue and the
+   * border/muted grays never drift between older console pages and the
+   * newer report/coach/evidence-drawer subtree. */
+  --color-accent: #1769ff;
+  --color-accent-strong: #0e5de8;
+  --color-border: #cdd5de;
+  --color-border-strong: #b9c2cc;
+  --color-muted: #6b7784;
+  --color-ink: #202a35;
+  --color-surface: #f7f9fb;
+  --color-surface-alt: #f5f7fa;
+
+  --color-report-accent: var(--color-accent);
+  --color-report-accent-ink: oklch(99% 0.004 255);
+  --color-report-focus: var(--color-accent-strong);
 
   /* Product-wide type roles. Page modules may compose these roles, but do not
    * invent a separate scale for the same title, body, or control semantics. */
@@ -64,10 +78,34 @@
   --space-report-12: 3rem;
   --space-report-16: 4rem;
 
+  /* General-purpose spacing scale for the older console pages (settings,
+   * company, knowledge, interview-setup, live-room, discovery, diagnostics).
+   * Mirrors the --space-report-* step values so both scales read as one
+   * system, without rewiring the report subtree's existing references. */
+  --space-1: 0.25rem;
+  --space-2: 0.375rem;
+  --space-3: 0.5rem;
+  --space-4: 0.75rem;
+  --space-5: 1rem;
+  --space-6: 1.25rem;
+  --space-7: 1.5rem;
+  --space-8: 2rem;
+
+  /* Shared control-height scale. Every button/input/select/icon-button on
+   * every page resolves to one of these three heights so the same control
+   * role never changes size when navigating between pages. */
+  --control-height-sm: 2rem;
+  --control-height-md: 2.375rem;
+  --control-height-lg: 2.625rem;
+
+  /* Shared page-level tab-bar height, so switching between pages that each
+   * have their own tab strip (knowledge, settings, ...) never shifts height. */
+  --tab-bar-height: 3.25rem;
+
   /* Shared application geometry. Primary navigation always lands inside the
    * same frame; individual work surfaces may grow vertically for their data. */
-  --layout-workspace-gutter: clamp(1.5rem, 5vw, 4.5rem);
-  --layout-primary-max-inline: 93.75rem;
+  --layout-workspace-gutter: clamp(1.25rem, 3vw, 3rem);
+  --layout-primary-max-inline: clamp(60rem, 97vw, 160rem);
   --layout-fixed-navigation-block: 0px;
   --layout-primary-min-block: min(
     47.5rem,
