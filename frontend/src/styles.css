@@ -6786,6 +6786,10 @@ a {
   line-height: var(--leading-control);
 }
 
+.workspace-frame button {
+  min-height: var(--control-height-sm);
+}
+
 .workspace-frame label {
   font-size: var(--text-label);
   line-height: var(--leading-control);

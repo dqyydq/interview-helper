@@ -384,9 +384,7 @@ async def get_interview_readiness(
     )
     worker_ready = await _worker_available(session)
     models = await model_readiness(session, profile.id)
-    missing_or_degraded = {
-        str(role) for role in [*models.missing_roles, *models.degraded_roles]
-    }
+    missing_or_degraded = {str(role) for role in [*models.missing_roles, *models.degraded_roles]}
     interviewer_ready = ModelRole.INTERVIEWER.value not in missing_or_degraded
     evaluator_ready = ModelRole.EVALUATOR.value not in missing_or_degraded
 

@@ -280,8 +280,9 @@ async def test_deleting_connection_removes_encrypted_secret_and_role_binding() -
 
 
 @pytest.mark.asyncio
-async def test_historic_embedding_connection_can_redact_credentials_after_roles_are_unbound(
-) -> None:
+async def test_historic_embedding_connection_can_redact_credentials_after_roles_are_unbound() -> (
+    None
+):
     async with AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False),
         base_url="http://test",

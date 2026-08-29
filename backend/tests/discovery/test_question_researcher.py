@@ -44,8 +44,7 @@ def _source() -> ResearcherSource:
         domain="example-public-site.dev",
         source_category="community_notes",
         excerpt=(
-            "Candidates should explain retrieval evaluation, offline metrics, and "
-            "failure analysis."
+            "Candidates should explain retrieval evaluation, offline metrics, and failure analysis."
         ),
     )
 
@@ -81,8 +80,7 @@ def _payload(*, source_id: uuid.UUID | None = None, evidence: str | None = None)
 
 
 @pytest.mark.asyncio
-async def test_researcher_receives_only_bounded_source_cards_and_materialises_grounded_candidates(
-) -> None:
+async def test_researcher_bounds_source_cards_and_materialises_grounded_candidates() -> None:
     provider = FakeProvider([_payload()])
 
     result = await curate_questions(
@@ -131,8 +129,7 @@ async def test_researcher_rejects_unknown_or_ungrounded_evidence() -> None:
 
 
 @pytest.mark.asyncio
-async def test_researcher_caps_source_excerpts_and_fails_before_provider_for_oversized_context(
-) -> None:
+async def test_researcher_bounds_excerpts_and_rejects_oversized_context() -> None:
     provider = FakeProvider([_payload(evidence="x" * 20)])
     source = _source()
     bounded = ResearcherSource(

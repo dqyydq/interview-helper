@@ -13,17 +13,15 @@ def test_catalog_exposes_only_supported_local_presets() -> None:
         "sensevoice-small",
     }
     assert all(preset.model_source == "modelscope" for preset in catalog.presets)
-    assert {
-        preset.model_id
-        for preset in catalog.presets
-    } == {
+    assert {preset.model_id for preset in catalog.presets} == {
         "intfloat/multilingual-e5-small",
         "BAAI/bge-m3",
         "iic/SenseVoiceSmall",
     }
-    assert next(
-        preset for preset in catalog.presets if preset.key == "bge-m3"
-    ).vector_dimensions == 1024
+    assert (
+        next(preset for preset in catalog.presets if preset.key == "bge-m3").vector_dimensions
+        == 1024
+    )
 
 
 def test_catalog_keys_match_checked_loader_presets() -> None:

@@ -144,9 +144,7 @@ async def get_embedding_index_status(
     latest_profile = profiles[0] if profiles else None
     current_failure = (
         failed
-        if latest_profile is not None
-        and failed is not None
-        and latest_profile.id == failed.id
+        if latest_profile is not None and failed is not None and latest_profile.id == failed.id
         else None
     )
 

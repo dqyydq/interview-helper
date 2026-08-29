@@ -14,7 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17-alpine
+        # Keep CI aligned with the local Compose database: migration 0008 enables
+        # the pgvector extension and must run against a server that provides it.
+        image: pgvector/pgvector@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21
         env:
           POSTGRES_DB: interview_helper_test
           POSTGRES_USER: interview_helper

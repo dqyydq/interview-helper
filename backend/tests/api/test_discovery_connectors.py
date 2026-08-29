@@ -309,9 +309,7 @@ async def test_concurrent_connector_creates_never_exceed_provider_limit(
     monkeypatch.setattr(service, "_lock_profile_provider_connectors", synchronized_lock)
 
     async def create_parallel_connector(index: int):
-        payload = DiscoveryConnectorCreate.model_validate(
-            connector_payload(f"Parallel {index}")
-        )
+        payload = DiscoveryConnectorCreate.model_validate(connector_payload(f"Parallel {index}"))
         async with async_session_factory() as session:
             return await service.create_connector(session, profile_id, payload)
 

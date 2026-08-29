@@ -460,8 +460,7 @@ def _replay_result(
             "This idempotency key was already used with a different request.",
         )
     if any(
-        DiscoveryImportStatus(row.status) is not DiscoveryImportStatus.SUCCEEDED
-        for row in existing
+        DiscoveryImportStatus(row.status) is not DiscoveryImportStatus.SUCCEEDED for row in existing
     ):
         raise _error(
             "discovery_import_conflict",

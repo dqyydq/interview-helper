@@ -268,9 +268,7 @@ async def test_worker_keeps_sources_and_marks_run_partial_when_curation_degrades
         run = await session.get(QuestionDiscoveryRun, run_id)
         job = await session.get(BackgroundJob, job_id)
         source_count = await session.scalar(
-            select(QuestionDiscoverySource)
-            .where(QuestionDiscoverySource.run_id == run_id)
-            .limit(1)
+            select(QuestionDiscoverySource).where(QuestionDiscoverySource.run_id == run_id).limit(1)
         )
 
     assert run is not None
@@ -363,9 +361,7 @@ async def test_worker_recovers_stale_discovery_job_before_claiming_queued_work(
 ) -> None:
     stale_run_id, stale_job_id = await make_queued_search_job()
     fresh_run_id, fresh_job_id = await make_queued_search_job()
-    stale_lock = utc_now() - timedelta(
-        seconds=discovery_jobs._discovery_job_lease_seconds() + 1
-    )
+    stale_lock = utc_now() - timedelta(seconds=discovery_jobs._discovery_job_lease_seconds() + 1)
 
     async with async_session_factory() as session:
         stale_job = await session.get(BackgroundJob, stale_job_id)

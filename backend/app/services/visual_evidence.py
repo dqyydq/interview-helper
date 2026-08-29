@@ -127,8 +127,7 @@ async def analyse_visual_evidence(
                 ),
                 company_name=company_name,
                 rounds=[
-                    VisualEvidenceRound(round_key=item.round_key, name=item.name)
-                    for item in rounds
+                    VisualEvidenceRound(round_key=item.round_key, name=item.name) for item in rounds
                 ],
                 context_window_tokens=connection.context_window_tokens,
                 max_output_tokens=connection.max_output_tokens,

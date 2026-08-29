@@ -179,7 +179,11 @@ def test_images_are_rejected_for_non_user_messages() -> None:
 
 @pytest.mark.parametrize(
     "url",
-    ["https://127.0.0.1/private.png", "https://localhost/private.png", "http://assets.example.org/a.png"],
+    [
+        "https://127.0.0.1/private.png",
+        "https://localhost/private.png",
+        "http://assets.example.org/a.png",
+    ],
 )
 def test_image_urls_reject_private_or_non_https_sources(url: str) -> None:
     with pytest.raises(ValidationError, match="image URL must be a public HTTPS URL"):

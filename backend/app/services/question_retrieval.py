@@ -39,9 +39,7 @@ def canonical_round_key(company_slug: str, round_key: str) -> str:
 
 def _applicability_values(values: list) -> set[str]:
     return {
-        value.strip().casefold()
-        for value in values
-        if isinstance(value, str) and value.strip()
+        value.strip().casefold() for value in values if isinstance(value, str) and value.strip()
     }
 
 

@@ -123,23 +123,35 @@ def test_question_target_match_rank_uses_canonical_company_and_round_keys() -> N
         )
 
     assert canonical_round_key(target_company, target_round) == "bytedance:round_2"
-    assert question_target_match_rank(
-        question(companies=["bytedance"], rounds=["bytedance:round_2"]),
-        company_slug=target_company,
-        round_key=target_round,
-    ) == 0
-    assert question_target_match_rank(
-        question(companies=["bytedance"], rounds=[]),
-        company_slug=target_company,
-        round_key=target_round,
-    ) == 1
-    assert question_target_match_rank(
-        question(companies=[], rounds=[]),
-        company_slug=target_company,
-        round_key=target_round,
-    ) == 2
-    assert question_target_match_rank(
-        question(companies=["alibaba"], rounds=["alibaba:round_2"]),
-        company_slug=target_company,
-        round_key=target_round,
-    ) == 3
+    assert (
+        question_target_match_rank(
+            question(companies=["bytedance"], rounds=["bytedance:round_2"]),
+            company_slug=target_company,
+            round_key=target_round,
+        )
+        == 0
+    )
+    assert (
+        question_target_match_rank(
+            question(companies=["bytedance"], rounds=[]),
+            company_slug=target_company,
+            round_key=target_round,
+        )
+        == 1
+    )
+    assert (
+        question_target_match_rank(
+            question(companies=[], rounds=[]),
+            company_slug=target_company,
+            round_key=target_round,
+        )
+        == 2
+    )
+    assert (
+        question_target_match_rank(
+            question(companies=["alibaba"], rounds=["alibaba:round_2"]),
+            company_slug=target_company,
+            round_key=target_round,
+        )
+        == 3
+    )

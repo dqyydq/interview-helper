@@ -94,9 +94,9 @@
   /* Shared control-height scale. Every button/input/select/icon-button on
    * every page resolves to one of these three heights so the same control
    * role never changes size when navigating between pages. */
-  --control-height-sm: 2rem;
-  --control-height-md: 2.375rem;
-  --control-height-lg: 2.625rem;
+  --control-height-sm: 32px;
+  --control-height-md: 40px;
+  --control-height-lg: 48px;
 
   /* Shared page-level tab-bar height, so switching between pages that each
    * have their own tab strip (knowledge, settings, ...) never shifts height. */

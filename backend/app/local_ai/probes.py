@@ -240,11 +240,7 @@ async def probe_all_local_capabilities(
 
     global _capability_cache, _capability_probe_task
     now = time.monotonic()
-    if (
-        cache_seconds > 0
-        and _capability_cache
-        and now - _capability_cache[0] <= cache_seconds
-    ):
+    if cache_seconds > 0 and _capability_cache and now - _capability_cache[0] <= cache_seconds:
         return list(_capability_cache[1])
 
     task = _capability_probe_task

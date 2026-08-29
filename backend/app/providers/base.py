@@ -76,9 +76,7 @@ class ConservativeTokenCounter:
     def count_messages(self, messages: list[ChatMessage]) -> int:
         content_tokens = sum(self.count_text(message.content) for message in messages)
         image_tokens = sum(
-            image.estimated_input_tokens
-            for message in messages
-            for image in message.images
+            image.estimated_input_tokens for message in messages for image in message.images
         )
         tool_tokens = sum(
             self.count_text(json.dumps(call.model_dump(), ensure_ascii=False))

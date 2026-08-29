@@ -49,9 +49,7 @@ async def _require_ready_local_transcriber(
     if health.status == LocalAiCapabilityStatus.MISMATCH:
         raise AppError(
             code="local_transcription_service_mismatch",
-            message=(
-                "本地 SenseVoice 服务身份不匹配，请使用本应用的 Docker 配置重启服务后重试。"
-            ),
+            message=("本地 SenseVoice 服务身份不匹配，请使用本应用的 Docker 配置重启服务后重试。"),
             status_code=503,
             retryable=True,
         )

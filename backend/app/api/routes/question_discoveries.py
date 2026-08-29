@@ -208,8 +208,7 @@ async def import_question_discovery_candidates(
             bank_id=payload.bank_id,
             idempotency_key=idempotency_key,
             items=tuple(
-                discovery_imports.DiscoveryImportItem(**item.model_dump())
-                for item in payload.items
+                discovery_imports.DiscoveryImportItem(**item.model_dump()) for item in payload.items
             ),
         ),
     )

@@ -58,9 +58,7 @@ def _profile_provider_connector_lock_key(
     """Return a stable advisory-lock key for one profile/provider connector bucket."""
 
     provider = _provider_type(provider_type)
-    digest = hashlib.sha256(
-        f"discovery-connectors:{profile_id}:{provider.value}".encode()
-    ).digest()
+    digest = hashlib.sha256(f"discovery-connectors:{profile_id}:{provider.value}".encode()).digest()
     return int.from_bytes(digest[:8], byteorder="big", signed=True)
 
 

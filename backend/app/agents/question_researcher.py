@@ -334,9 +334,7 @@ async def curate_questions(
 
     bounded_sources = _bounded_sources(
         sources,
-        per_source_characters=(
-            per_source_characters or settings.discovery_max_excerpt_characters
-        ),
+        per_source_characters=(per_source_characters or settings.discovery_max_excerpt_characters),
         total_characters=(
             total_excerpt_characters or settings.discovery_max_total_excerpt_characters
         ),

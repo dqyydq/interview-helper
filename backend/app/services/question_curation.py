@@ -197,7 +197,9 @@ async def _persist_candidates(
         inserted += 1
     await session.flush()
     total = await session.scalar(
-        select(func.count()).select_from(QuestionDiscoveryCandidate).where(
+        select(func.count())
+        .select_from(QuestionDiscoveryCandidate)
+        .where(
             QuestionDiscoveryCandidate.profile_id == run.profile_id,
             QuestionDiscoveryCandidate.run_id == run.id,
             QuestionDiscoveryCandidate.deleted_at.is_(None),

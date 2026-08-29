@@ -177,10 +177,7 @@ def _payload(
     return {
         "task": "Extract at most eight anonymised company-interview evidence drafts.",
         "company_name": company_name[:160],
-        "rounds": [
-            {"round_key": item.round_key, "name": item.name[:120]}
-            for item in rounds
-        ],
+        "rounds": [{"round_key": item.round_key, "name": item.name[:120]} for item in rounds],
         "allowed_field_paths": list(field_paths),
         "output_rules": {
             "excerpt": "A short paraphrase, not a quote or a question transcript.",

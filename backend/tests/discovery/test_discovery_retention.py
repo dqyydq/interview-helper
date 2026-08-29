@@ -52,9 +52,7 @@ async def _clear_retention_rows() -> None:
         profile_ids = list(
             (
                 await session.scalars(
-                    select(UserProfile.id).where(
-                        UserProfile.display_name.like("Retention test %")
-                    )
+                    select(UserProfile.id).where(UserProfile.display_name.like("Retention test %"))
                 )
             ).all()
         )

@@ -196,7 +196,7 @@ def build_query_snapshot(
     if mode is DiscoverySourceMode.SEARCH:
         snapshot["search_query"] = _search_text(payload)
     else:
-        urls = list(payload.urls[:max_urls()])
+        urls = list(payload.urls[: max_urls()])
         if len(urls) != len(payload.urls):
             raise _safe_error(
                 "discovery_url_limit_exceeded",
@@ -649,4 +649,4 @@ def source_policy_metadata(*, matched_allow_domain: str | None, scheme: str, por
 def bounded_sources[T](sources: Sequence[T]) -> tuple[T, ...]:
     """One reusable hard cap for both search and pasted URL modes."""
 
-    return tuple(sources[:max_sources()])
+    return tuple(sources[: max_sources()])

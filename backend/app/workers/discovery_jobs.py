@@ -576,14 +576,18 @@ async def _source_counts(
     run: QuestionDiscoveryRun,
 ) -> tuple[int, int, int]:
     total = await session.scalar(
-        select(func.count()).select_from(QuestionDiscoverySource).where(
+        select(func.count())
+        .select_from(QuestionDiscoverySource)
+        .where(
             QuestionDiscoverySource.profile_id == run.profile_id,
             QuestionDiscoverySource.run_id == run.id,
             QuestionDiscoverySource.deleted_at.is_(None),
         )
     )
     fetched = await session.scalar(
-        select(func.count()).select_from(QuestionDiscoverySource).where(
+        select(func.count())
+        .select_from(QuestionDiscoverySource)
+        .where(
             QuestionDiscoverySource.profile_id == run.profile_id,
             QuestionDiscoverySource.run_id == run.id,
             QuestionDiscoverySource.deleted_at.is_(None),
@@ -591,7 +595,9 @@ async def _source_counts(
         )
     )
     failed = await session.scalar(
-        select(func.count()).select_from(QuestionDiscoverySource).where(
+        select(func.count())
+        .select_from(QuestionDiscoverySource)
+        .where(
             QuestionDiscoverySource.profile_id == run.profile_id,
             QuestionDiscoverySource.run_id == run.id,
             QuestionDiscoverySource.deleted_at.is_(None),
@@ -613,7 +619,9 @@ async def _complete_run(
     await _raise_if_cancelled(session, run)
     total, fetched, failed = await _source_counts(session, run)
     candidate_count = await session.scalar(
-        select(func.count()).select_from(QuestionDiscoveryCandidate).where(
+        select(func.count())
+        .select_from(QuestionDiscoveryCandidate)
+        .where(
             QuestionDiscoveryCandidate.profile_id == run.profile_id,
             QuestionDiscoveryCandidate.run_id == run.id,
             QuestionDiscoveryCandidate.deleted_at.is_(None),
@@ -747,7 +755,9 @@ async def _recover_stale_discovery_jobs(session: AsyncSession) -> int:
             await _mark_pending_sources_failed(session, run, code=code)
             source_count, _, failed_source_count = await _source_counts(session, run)
             candidate_count = await session.scalar(
-                select(func.count()).select_from(QuestionDiscoveryCandidate).where(
+                select(func.count())
+                .select_from(QuestionDiscoveryCandidate)
+                .where(
                     QuestionDiscoveryCandidate.profile_id == run.profile_id,
                     QuestionDiscoveryCandidate.run_id == run.id,
                     QuestionDiscoveryCandidate.deleted_at.is_(None),

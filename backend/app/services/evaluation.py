@@ -64,8 +64,7 @@ def _style_profile_snapshot(plan: InterviewPlan | None) -> StyleProfilePublic:
     raw_trust = plan_snapshot.get("style_pack_trust")
     trust_snapshot = raw_trust if isinstance(raw_trust, dict) else {}
     has_legacy_trust = any(
-        key in plan_snapshot
-        for key in ("style_pack_trust_status", "style_pack_evidence_count")
+        key in plan_snapshot for key in ("style_pack_trust_status", "style_pack_evidence_count")
     )
     snapshot_available = isinstance(raw_trust, dict) or has_legacy_trust
 
@@ -94,15 +93,11 @@ def _style_profile_snapshot(plan: InterviewPlan | None) -> StyleProfilePublic:
     raw_version = plan_snapshot.get("style_pack_version")
     version = (
         raw_version
-        if isinstance(raw_version, int)
-        and not isinstance(raw_version, bool)
-        and raw_version >= 1
+        if isinstance(raw_version, int) and not isinstance(raw_version, bool) and raw_version >= 1
         else None
     )
     raw_latest_evidence_at = trust_snapshot.get("latest_evidence_at")
-    latest_evidence_at = (
-        raw_latest_evidence_at if isinstance(raw_latest_evidence_at, str) else None
-    )
+    latest_evidence_at = raw_latest_evidence_at if isinstance(raw_latest_evidence_at, str) else None
 
     source_summaries: list[StyleProfileSourceSummary] = []
     raw_sources = trust_snapshot.get("source_summaries")

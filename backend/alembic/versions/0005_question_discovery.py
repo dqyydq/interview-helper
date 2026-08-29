@@ -589,18 +589,29 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("question_source_provenance")
-    op.drop_index("uq_discovery_import_success_candidate_bank", table_name="question_discovery_imports")
+    op.drop_index(
+        "uq_discovery_import_success_candidate_bank", table_name="question_discovery_imports"
+    )
     op.drop_index("ix_discovery_imports_profile_status", table_name="question_discovery_imports")
-    op.drop_index(op.f("ix_question_discovery_imports_status"), table_name="question_discovery_imports")
-    op.drop_index(op.f("ix_question_discovery_imports_batch_id"), table_name="question_discovery_imports")
+    op.drop_index(
+        op.f("ix_question_discovery_imports_status"), table_name="question_discovery_imports"
+    )
+    op.drop_index(
+        op.f("ix_question_discovery_imports_batch_id"), table_name="question_discovery_imports"
+    )
     op.drop_index(
         op.f("ix_question_discovery_imports_request_hash"), table_name="question_discovery_imports"
     )
     op.drop_index(
-        op.f("ix_question_discovery_imports_idempotency_key"), table_name="question_discovery_imports"
+        op.f("ix_question_discovery_imports_idempotency_key"),
+        table_name="question_discovery_imports",
     )
-    op.drop_index(op.f("ix_question_discovery_imports_question_id"), table_name="question_discovery_imports")
-    op.drop_index(op.f("ix_question_discovery_imports_bank_id"), table_name="question_discovery_imports")
+    op.drop_index(
+        op.f("ix_question_discovery_imports_question_id"), table_name="question_discovery_imports"
+    )
+    op.drop_index(
+        op.f("ix_question_discovery_imports_bank_id"), table_name="question_discovery_imports"
+    )
     op.drop_index(
         op.f("ix_question_discovery_imports_candidate_content_hash"),
         table_name="question_discovery_imports",
@@ -608,7 +619,9 @@ def downgrade() -> None:
     op.drop_index(
         op.f("ix_question_discovery_imports_candidate_id"), table_name="question_discovery_imports"
     )
-    op.drop_index(op.f("ix_question_discovery_imports_profile_id"), table_name="question_discovery_imports")
+    op.drop_index(
+        op.f("ix_question_discovery_imports_profile_id"), table_name="question_discovery_imports"
+    )
     op.drop_table("question_discovery_imports")
     op.drop_table("question_discovery_candidate_evidence")
     op.drop_table("question_discovery_candidates")

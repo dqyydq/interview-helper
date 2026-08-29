@@ -62,6 +62,37 @@ const planReady = {
   ],
 };
 
+const readiness = {
+  ready: true,
+  blocking: [
+    { key: "database", status: "ready", label: "本地数据库" },
+    { key: "worker", status: "ready", label: "后台 Worker" },
+    { key: "interviewer", status: "ready", label: "面试官模型" },
+    { key: "evaluator", status: "ready", label: "评估模型" },
+  ],
+  enhancements: [],
+  defaults: {
+    quick_trial: {
+      session_kind: "quick_trial",
+      duration_minutes: 10,
+      target_question_count: 2,
+      include_in_trends: false,
+      role_name: "llm_application_engineer",
+    },
+  },
+  company_profile: {
+    company_id: company.id,
+    round_profile_id: company.latest_style_pack.rounds[0].id,
+    style_pack_id: company.latest_style_pack.id,
+    pack_version: company.latest_style_pack.pack_version,
+    trust_status: "source_backed",
+    trust_label: "用户资料与公开经验整理",
+    evidence_count: 2,
+    latest_evidence_at: null,
+    source_summaries: [],
+  },
+};
+
 const session = {
   id: "session-1",
   status: "interviewing",
@@ -292,6 +323,9 @@ test.beforeEach(async ({ page }) => {
   );
   await page.route("**/api/resumes", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
+  await page.route(/\/api\/interview-readiness(?:\?.*)?$/, (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(readiness) }),
   );
   await page.route("**/api/interview-plans", (route) =>
     route.fulfill({

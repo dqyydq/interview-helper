@@ -62,9 +62,7 @@ class ImportFixture:
 
 
 def _evidence_hash(candidate_hash: str, source_id: uuid.UUID, excerpt: str) -> str:
-    return hashlib.sha256(
-        f"{candidate_hash}:{source_id}:{excerpt}".encode()
-    ).hexdigest()
+    return hashlib.sha256(f"{candidate_hash}:{source_id}:{excerpt}".encode()).hexdigest()
 
 
 async def _make_fixture(*, candidate_count: int = 2) -> ImportFixture:
